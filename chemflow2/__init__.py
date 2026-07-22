@@ -40,8 +40,8 @@ from chemflow2.core import (
     flows_on,
     get_component,
 )
-from chemflow2.io import stream_table, to_csv
-from chemflow2.units import Mixer, Reactor, Separator
+from chemflow2.io import export_mermaid, generate_mermaid, stream_table, to_csv
+from chemflow2.units import Mixer, Reactor, Separator, Splitter
 
 __all__ = [
     # core
@@ -62,9 +62,12 @@ __all__ = [
     "Mixer",
     "Reactor",
     "Separator",
+    "Splitter",
     # io
     "stream_table",
     "to_csv",
+    "generate_mermaid",
+    "export_mermaid",
     # errors
     "ChemflowError",
     "ComponentError",

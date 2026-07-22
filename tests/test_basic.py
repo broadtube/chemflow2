@@ -14,8 +14,10 @@ from chemflow2 import (
     ReactionError,
     Reactor,
     Separator,
+    Splitter,
     Stream,
     SolveError,
+    generate_mermaid,
 )
 
 
@@ -102,6 +104,71 @@ def test_flow_expr_constraint():
     assert sol.success
     assert a.flow_of("N2O4") == pytest.approx(10.0)
     assert a.flow_of("NO2") == pytest.approx(3.0)
+
+
+def test_splitter_ratio_and_composition():
+    feed = Stream(["N2O4", "NO2"], flows={"N2O4": 6, "NO2": 4})
+    a = Stream(["N2O4", "NO2"], name="a")
+    b = Stream(["N2O4", "NO2"], name="b")
+    p = Problem([feed, a, b], [Splitter(feed, [a, b], ratios=[0.7, 0.3])])
+    sol = p.solve()
+    assert sol.success
+    # 比率どおり & 組成は入口と同一
+    assert a.flow_of("N2O4") == pytest.approx(4.2)
+    assert a.flow_of("NO2") == pytest.approx(2.8)
+    assert b.flow_of("N2O4") == pytest.approx(1.8)
+    assert b.flow_of("NO2") == pytest.approx(1.2)
+
+
+def test_splitter_ratio_sum_check():
+    feed = Stream(["N2O4", "NO2"], flows={"N2O4": 10, "NO2": 0})
+    a = Stream(["N2O4", "NO2"], name="a")
+    b = Stream(["N2O4", "NO2"], name="b")
+    with pytest.raises(ValueError):
+        Splitter(feed, [a, b], ratios=[0.7, 0.7])
+
+
+def test_recycle_with_splitter():
+    comps = ["N2O4", "NO2"]
+    feed = Stream(comps, flows={"N2O4": 10, "NO2": 0})
+    rec = Stream(comps, name="rec")
+    mixed = Stream(comps, name="mixed")
+    rout = Stream(comps, name="rout")
+    prod = Stream(comps, name="prod")
+    rxn = Reaction({"N2O4": -1, "NO2": 2})
+    p = Problem(
+        [feed, rec, mixed, rout, prod],
+        [
+            Mixer([feed, rec], mixed),
+            Reactor(mixed, rout, [rxn], key_component="N2O4", conversion=0.5),
+            Splitter(rout, [prod, rec], ratios=[0.7, 0.3]),
+        ],
+    )
+    sol = p.solve(bounds=(0, np.inf))
+    assert sol.success
+    assert rec.total_flow.eval() == pytest.approx(0.3 * rout.total_flow.eval())
+    # 元素収支: 入 N = 出 N
+    assert 2 * feed.flow_of("N2O4") == pytest.approx(
+        2 * prod.flow_of("N2O4") + prod.flow_of("NO2")
+    )
+
+
+def test_generate_mermaid_shows_loop():
+    comps = ["N2O4", "NO2"]
+    feed = Stream(comps, flows={"N2O4": 10, "NO2": 0}, name="Feed")
+    rec = Stream(comps, name="Recycle")
+    mixed = Stream(comps, name="Mixed")
+    rout = Stream(comps, name="ReactOut")
+    prod = Stream(comps, name="Product")
+    rxn = Reaction({"N2O4": -1, "NO2": 2})
+    m = Mixer([feed, rec], mixed, name="M1")
+    r = Reactor(mixed, rout, [rxn], key_component="N2O4", conversion=0.5, name="R1")
+    sp = Splitter(rout, [prod, rec], ratios=[0.7, 0.3], name="SP1")
+    src = generate_mermaid(Problem([feed, rec, mixed, rout, prod], [m, r, sp]))
+    assert "flowchart" in src
+    assert "feed_Feed" in src          # フィードノード
+    assert "prod_Product" in src       # プロダクトノード
+    assert "U_SP1 -->|Recycle| U_M1" in src  # 循環エッジ
 
 
 def test_dof_mismatch_raises():

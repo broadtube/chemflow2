@@ -7,5 +7,6 @@
 from chemflow2.units.mixer import Mixer
 from chemflow2.units.reactor import Reactor
 from chemflow2.units.separator import Separator
+from chemflow2.units.splitter import Splitter
 
-__all__ = ["Mixer", "Reactor", "Separator"]
+__all__ = ["Mixer", "Reactor", "Separator", "Splitter"]

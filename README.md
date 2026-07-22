@@ -26,10 +26,19 @@ chemflow2/
 ├── units/        差し替え・追加可能な装置
 │   ├── mixer.py       Mixer
 │   ├── reactor.py     Reactor（転化率 + 選択率 + 複数反応）
-│   └── separator.py   Separator（物質収支のみ。分配は制約で指定）
+│   ├── separator.py   Separator（物質収支のみ。分配は制約で指定）
+│   └── splitter.py    Splitter（組成そのまま比率分割。分流・パージ）
 └── io/           出力
-    └── table.py       テキスト表 / CSV
+    ├── table.py       テキスト表 / CSV
+    └── diagram.py     Mermaid フロー図（ソース文字列 / 自己完結 HTML）
 ```
+
+### Separator と Splitter の使い分け
+
+| | 課す残差 | 組成 | 用途 |
+|---|---|---|---|
+| `Splitter(inlet, [out...], ratios=[...])` | 出口 = 入口 × 比率 | 入口と同一 | 分流・パージ・循環分岐 |
+| `Separator(inlet, [out...])` | 入口 = Σ出口（収支のみ） | 変わる | 分離塔・気液分離（分配は制約で指定） |
 
 ## 使い方
 
@@ -63,8 +72,19 @@ sol.print_report()
 
 ```bash
 PYTHONPATH=. python3 examples/example_declarative.py   # 宣言的な書き方
-PYTHONPATH=. python3 examples/example_recycle.py       # 循環系
+PYTHONPATH=. python3 examples/example_recycle.py       # 循環系（Separator + 制約）
+PYTHONPATH=. python3 examples/example_splitter.py      # 循環系（Splitter で簡潔に）
+PYTHONPATH=. python3 examples/example_diagram.py       # Mermaid フロー図の出力
 PYTHONPATH=. python3 -m pytest tests/ -q
+```
+
+### フロー図の出力
+
+```python
+from chemflow2 import generate_mermaid, export_mermaid
+
+print(generate_mermaid(problem))                       # Mermaid ソース文字列
+export_mermaid(problem, "flow.html", title="My Flow")  # ブラウザで開ける HTML
 ```
 
 ## 新しい装置を足す
