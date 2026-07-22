@@ -16,8 +16,10 @@ from chemflow2 import (
     Separator,
     Splitter,
     Stream,
+    StreamCondition,
     SolveError,
     generate_mermaid,
+    parse_pressure,
 )
 
 
@@ -169,6 +171,46 @@ def test_generate_mermaid_shows_loop():
     assert "feed_Feed" in src          # フィードノード
     assert "prod_Product" in src       # プロダクトノード
     assert "U_SP1 -->|Recycle| U_M1" in src  # 循環エッジ
+
+
+def test_parse_pressure():
+    assert parse_pressure(200000) == pytest.approx(200000)
+    assert parse_pressure("2MPa") == pytest.approx(2e6)
+    assert parse_pressure("2MPaG") == pytest.approx(2e6 + 101325)
+    assert parse_pressure("1atm") == pytest.approx(101325)
+
+
+def test_constrain_recovery():
+    comps = ["CO", "H2O"]
+    feed = Stream(comps, flows={"CO": 10, "H2O": 4})
+    gas = Stream(comps, name="gas")
+    liq = Stream(comps, name="liq")
+    p = Problem([feed, gas, liq], [Separator(feed, [gas, liq])])
+    # H2O は 75% を液へ、CO は 0%（全量ガス）
+    p.constrain_recovery(feed, liq, {"H2O": 0.75, "CO": 0.0})
+    sol = p.solve()
+    assert sol.success
+    assert liq.flow_of("H2O") == pytest.approx(3.0)
+    assert liq.flow_of("CO") == pytest.approx(0.0)
+    assert gas.flow_of("H2O") == pytest.approx(1.0)
+    assert gas.flow_of("CO") == pytest.approx(10.0)
+
+
+def test_gibbs_reactor_smr():
+    pytest.importorskip("cantera")
+    from chemflow2 import GibbsReactor
+
+    species = ["CH4", "H2O", "CO", "CO2", "H2"]
+    feed = Stream(species, flows={"CH4": 1.0, "H2O": 2.0, "CO": 0, "CO2": 0, "H2": 0},
+                  condition=StreamCondition(T=850, P="0.1MPa"))
+    out = Stream(species, name="out")
+    g = GibbsReactor(feed, out, species=species, T=850, P="0.1MPa")
+    sol = Problem([feed, out], [g]).solve()
+    assert sol.success
+    # 高温・S/C=2 では CH4 はほぼ完全に改質される
+    assert out.flow_of("CH4") < 0.05
+    # 元素 C 収支: 入 1 = 出（CO+CO2+CH4）
+    assert out.flow_of("CO") + out.flow_of("CO2") + out.flow_of("CH4") == pytest.approx(1.0, abs=1e-3)
 
 
 def test_dof_mismatch_raises():

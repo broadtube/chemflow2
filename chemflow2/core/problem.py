@@ -86,6 +86,31 @@ class Problem:
             Constraint(lambda: np.atleast_1d(value_of(lhs) - value_of(rhs)), name)
         )
 
+    def constrain_recovery(
+        self,
+        inlet: Stream,
+        outlet: Stream,
+        fracs: dict[str, float],
+        *,
+        name: str | None = None,
+    ) -> None:
+        """成分回収率を指定する: ``outlet.flow(c) = frac · inlet.flow(c)``。
+
+        Separator（収支のみ課すノード）と組み合わせて分離を簡潔に閉じる。
+
+            # H2O は全量 Liquid へ、それ以外は全量 Gas へ（= Liquid への回収率 0）
+            problem.constrain_recovery(S3, S5, {"H2O": 1.0, "H2": 0.0, "CO": 0.0,
+                                                "CO2": 0.0, "CH3OCH3": 0.0})
+        """
+        for formula, frac in fracs.items():
+            label = name or f"recovery[{formula}] {inlet.name}->{outlet.name}={frac}"
+            self.constraints.append(
+                Constraint(
+                    lambda f=formula, r=frac: np.atleast_1d(outlet.flow_of(f) - r * inlet.flow_of(f)),
+                    label,
+                )
+            )
+
     def constrain_fracs(self, stream: Stream, fracs: dict[str, float], *, name: str | None = None) -> None:
         """ストリームのモル分率を指定する。
 

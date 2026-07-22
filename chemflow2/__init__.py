@@ -40,8 +40,9 @@ from chemflow2.core import (
     flows_on,
     get_component,
 )
+from chemflow2.core.pressure import parse_pressure
 from chemflow2.io import export_mermaid, generate_mermaid, stream_table, to_csv
-from chemflow2.units import Mixer, Reactor, Separator, Splitter
+from chemflow2.units import CanteraError, GibbsReactor, Mixer, Reactor, Separator, Splitter
 
 __all__ = [
     # core
@@ -63,6 +64,8 @@ __all__ = [
     "Reactor",
     "Separator",
     "Splitter",
+    "GibbsReactor",
+    "parse_pressure",
     # io
     "stream_table",
     "to_csv",
@@ -75,4 +78,5 @@ __all__ = [
     "ConstraintError",
     "ReactionError",
     "SolveError",
+    "CanteraError",
 ]

@@ -15,6 +15,7 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest"]
+gibbs = ["cantera"]
 
 [tool.setuptools.packages.find]
 include = ["chemflow2*"]
