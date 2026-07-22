@@ -14,8 +14,9 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest"]
+dev = ["pytest", "openpyxl"]
 gibbs = ["cantera"]
+excel = ["openpyxl"]
 
 [tool.setuptools.packages.find]
 include = ["chemflow2*"]

@@ -213,6 +213,32 @@ def test_gibbs_reactor_smr():
     assert out.flow_of("CO") + out.flow_of("CO2") + out.flow_of("CH4") == pytest.approx(1.0, abs=1e-3)
 
 
+def test_to_excel(tmp_path):
+    pytest.importorskip("openpyxl")
+    from openpyxl import load_workbook
+
+    from chemflow2 import to_excel
+
+    a = Stream(["N2", "H2"], name="1. A", order=1, flows={"N2": 1, "H2": 3},
+               condition=StreamCondition(T=25, P="0.1MPaG", phase="gas"))
+    b = Stream(["N2", "H2"], name="2. B", order=2, flows={"N2": 2, "H2": 1})
+    out = Stream(["N2", "H2"], name="3. Out", order=3)
+    p = Problem([a, b, out], [Mixer([a, b], out)])
+    p.solve()
+
+    path = tmp_path / "streams.xlsx"
+    to_excel(p.streams, str(path), sheet="Streams")
+    assert path.exists()
+
+    ws = load_workbook(str(path))["Streams"]
+    header = [c.value for c in ws[1]]
+    assert header == ["Component", "MW", "1. A", "2. B", "3. Out"]
+    # 総モル流量行の Out 列 = 3 + 4 = 7
+    totals = {r[0].value: r for r in ws.iter_rows()}
+    total_row = totals["total [mol/h]"]
+    assert total_row[4].value == pytest.approx(7.0)
+
+
 def test_dof_mismatch_raises():
     feed = Stream(["N2O4", "NO2"], flows={"N2O4": 10, "NO2": 0})
     out = Stream(["N2O4", "NO2"], name="out")
