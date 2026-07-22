@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "chemflow2"
+version = "0.1.0"
+description = "シンプルな定常状態プロセスシミュレーター（残差方式 + scipy）"
+requires-python = ">=3.10"
+dependencies = [
+    "numpy",
+    "scipy",
+    "molmass",
+]
+
+[project.optional-dependencies]
+dev = ["pytest"]
+
+[tool.setuptools.packages.find]
+include = ["chemflow2*"]
