@@ -428,4 +428,5 @@ G = GibbsReactor(Feed, Out, species=["CH4","H2O","CO","CO2","H2"], T=850, P="0.1
 | `example_gibbs.py` | Gibbs 平衡反応器（水蒸気メタン改質、要 cantera） |
 | `example_diagram.py` | Mermaid フロー図の出力 |
 | `example_multibasis.py` | 多 basis 出力（mol/h・g/h・NL/h・分率） |
+| `example_plant.py` | 合成ガス多段プラント（反応 + 凝縮 + 2 分離塔 + 循環 2 系統） |
 | `example_excel.py` | Excel 出力（要 openpyxl） |
