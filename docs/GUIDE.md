@@ -302,12 +302,28 @@ problem.constrain(Expr(lambda: Recycle.molar_flows - 0.3 * Rout.molar_flows))
 ```python
 from chemflow2 import stream_table, to_csv, to_excel, generate_mermaid, export_mermaid
 
-print(stream_table(problem.streams))          # テキスト表（total_mass 行で質量閉包を確認）
+print(stream_table(problem.streams))          # テキスト表（total[g/h] 行で質量閉包を確認）
 to_csv(problem.streams, "streams.csv")        # CSV
 to_excel(problem.streams, "streams.xlsx")     # Excel（要 openpyxl: pip install chemflow2[excel]）
 
 print(generate_mermaid(problem))              # Mermaid ソース文字列（Markdown に貼れる）
 export_mermaid(problem, "flow.html", title="My Flowsheet")  # 自己完結 HTML
+```
+
+**多 basis 出力**: `stream_table` / `to_csv` / `to_excel` は `basis` 引数を取る。
+単一 or 複数を指定でき、複数指定すると basis ごとにセクションを重ねる。
+
+| basis | 単位 |
+|-------|------|
+| `"mol"`（既定） | mol/h |
+| `"mass"` | g/h |
+| `"normal_volume"` | NL/h |
+| `"mole_frac"` / `"mass_frac"` / `"volume_frac"` | mol% / wt% / vol% |
+
+```python
+# モル・質量・ノルマル体積・モル分率を一度に
+print(stream_table(problem.streams, basis=["mol", "mass", "normal_volume", "mole_frac"]))
+to_excel(problem.streams, "streams.xlsx", basis=["mol", "mass"])
 ```
 
 `stream_table` / 出力はすべて `Stream.order` の昇順で並ぶ。
@@ -411,4 +427,5 @@ G = GibbsReactor(Feed, Out, species=["CH4","H2O","CO","CO2","H2"], T=850, P="0.1
 | `example_recovery.py` | 成分回収率で分離を指定 |
 | `example_gibbs.py` | Gibbs 平衡反応器（水蒸気メタン改質、要 cantera） |
 | `example_diagram.py` | Mermaid フロー図の出力 |
+| `example_multibasis.py` | 多 basis 出力（mol/h・g/h・NL/h・分率） |
 | `example_excel.py` | Excel 出力（要 openpyxl） |

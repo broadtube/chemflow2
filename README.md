@@ -82,16 +82,27 @@ PYTHONPATH=. python3 examples/example_diagram.py       # Mermaid フロー図の
 PYTHONPATH=. python3 examples/example_recovery.py      # 成分回収率で分離を指定
 PYTHONPATH=. python3 examples/example_gibbs.py         # Gibbs 平衡反応器（要 cantera）
 PYTHONPATH=. python3 examples/example_excel.py         # Excel 出力（要 openpyxl）
+PYTHONPATH=. python3 examples/example_multibasis.py    # 多 basis 出力
 PYTHONPATH=. python3 -m pytest tests/ -q
+```
+
+### 多 basis 出力
+
+`stream_table` / `to_csv` / `to_excel` は `basis` 引数を取り、mol/h・g/h・NL/h・各分率
+（mol%/wt%/vol%）を出せる。複数指定で basis ごとにセクションを重ねる（既定 `"mol"`）。
+
+```python
+from chemflow2 import stream_table
+print(stream_table(problem.streams, basis=["mol", "mass", "normal_volume", "mole_frac"]))
 ```
 
 ### Excel 出力（オプション）
 
-`pip install chemflow2[excel]`。成分ごとのモル流量・T/P/相・総モル/総質量を 1 シートに出力する。
+`pip install chemflow2[excel]`。成分ごとの流量・T/P/相・合計を 1 シートに出力する。`basis` 対応。
 
 ```python
 from chemflow2 import to_excel
-to_excel(problem.streams, "streams.xlsx", sheet="Streams")
+to_excel(problem.streams, "streams.xlsx", sheet="Streams", basis=["mol", "mass"])
 ```
 
 ### 分離の指定（回収率）

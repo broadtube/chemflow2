@@ -245,6 +245,30 @@ def test_to_excel(tmp_path):
     assert total_row[4].value == pytest.approx(7.0)
 
 
+def test_multibasis_table():
+    from chemflow2 import stream_table
+
+    s = Stream(["H2", "O2"], name="S1", order=1, flows={"H2": 2, "O2": 1})
+    txt = stream_table([s], basis=["mol", "mass", "normal_volume", "mole_frac"])
+    assert "[mol/h]" in txt and "[g/h]" in txt and "[NL/h]" in txt and "[mol%]" in txt
+    # 質量: O2 = 1 mol * 32 g/mol = 32
+    lines = txt.splitlines()
+    gh_start = lines.index("[g/h]")
+    o2_mass = float(lines[gh_start + 2].split()[-1])   # H2 行の次が O2 行
+    assert o2_mass == pytest.approx(31.998, abs=0.01)
+
+
+def test_multibasis_csv(tmp_path):
+    from chemflow2 import to_csv
+
+    s = Stream(["H2", "O2"], name="S1", flows={"H2": 2, "O2": 1})
+    path = tmp_path / "out.csv"
+    to_csv([s], str(path), basis=["mol", "mass"])
+    text = path.read_text()
+    assert "basis,component,S1" in text
+    assert "g/h,O2" in text and "mol/h,H2" in text
+
+
 def test_dof_mismatch_raises():
     feed = Stream(["N2O4", "NO2"], flows={"N2O4": 10, "NO2": 0})
     out = Stream(["N2O4", "NO2"], name="out")
