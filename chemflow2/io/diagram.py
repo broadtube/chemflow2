@@ -140,8 +140,9 @@ _HTML = """<!doctype html>
   th,td{{border:1px solid #ccc;padding:2px 10px;text-align:left}}
   th{{background:#f5f5f5}}
   .legend{{margin-top:1.5rem}}
-  /* diamond スタイル: エッジラベルの既定背景を消し、白いひし形だけを見せる */
-  .edgeLabel, .edgeLabel p {{ background: transparent !important; }}
+  /* diamond スタイル: エッジラベルの既定背景（.labelBkg の薄いグレー）を消し、
+     白いひし形だけを見せる */
+  .edgeLabel, .edgeLabel p, .labelBkg {{ background-color: transparent !important; }}
 </style>
 </head>
 <body>
