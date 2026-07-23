@@ -128,7 +128,14 @@ from chemflow2 import generate_mermaid, export_mermaid
 
 print(generate_mermaid(problem))                       # Mermaid ソース文字列
 export_mermaid(problem, "flow.html", title="My Flow")  # 凡例表つき HTML
+
+# 線の中央に番号入りの白いひし形（SVG）を乗せる PFD 風スタイル
+export_mermaid(problem, "flow.html", style="diamond")  # このHTML専用（securityLevel:'loose'）
 ```
+
+`style="diamond"` は実 PFD のように番号をひし形マーカーで線上に描く。Mermaid のラベルに
+インライン SVG を注入するため `securityLevel:'loose'` が要り、`export_mermaid` の HTML で
+のみ描画される（生ソースを GitHub 等に貼る用途は既定の `"badge"` を使う）。
 
 ## 新しい装置を足す
 

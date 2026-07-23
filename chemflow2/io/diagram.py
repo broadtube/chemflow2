@@ -38,6 +38,28 @@ def _badge(n) -> str:
     return f"({n})"
 
 
+def _svg_diamond(n) -> str:
+    """線の中央に乗る白背景のひし形（番号入り）SVG。style='diamond' 用。
+
+    viewBox を縦長にして下寄せし、線より少し下にひし形が来るようにしている。
+    背景は白（fill='#ffffff'）で連続線を隠す。
+    """
+    return (
+        "<svg width='26' height='34' viewBox='0 0 26 34' style='overflow:visible'>"
+        "<polygon points='13,10 24,21 13,32 2,21' fill='#ffffff' stroke='#333' stroke-width='1.6'/>"
+        f"<text x='13' y='25' text-anchor='middle' font-size='12' "
+        f"font-family='sans-serif' fill='#111'>{n}</text>"
+        "</svg>"
+    )
+
+
+def _stream_label(number, name: str | None, style: str) -> tuple[str, bool]:
+    """(ラベル文字列, HTMLか) を返す。diamond は SVG（番号のみ）、badge は丸数字+名前。"""
+    if style == "diamond":
+        return _svg_diamond(number), True
+    return f"{_badge(number)} {_label(name)}".strip(), False
+
+
 def _collect_streams(units: list) -> list[Stream]:
     streams: list[Stream] = []
     for u in units:
@@ -62,8 +84,13 @@ def _numbered_streams(units: list) -> list[tuple[str, object, Stream]]:
     return result
 
 
-def generate_mermaid(source, *, direction: str = "LR") -> str:
-    """Problem もしくは units リストから Mermaid flowchart を生成する。"""
+def generate_mermaid(source, *, direction: str = "LR", style: str = "badge") -> str:
+    """Problem もしくは units リストから Mermaid flowchart を生成する。
+
+    style="badge"（既定）… 連続線の中央に丸数字 + 名前。ポータブル（GitHub 等でも描画）。
+    style="diamond" … 線の中央に番号入りの白いひし形（SVG）。要 securityLevel:'loose'
+        なので export_mermaid の HTML でのみ正しく描画される。
+    """
     units = _units(source)
     lines = [f"flowchart {direction}"]
 
@@ -71,25 +98,26 @@ def generate_mermaid(source, *, direction: str = "LR") -> str:
     for u in units:
         lines.append(f'    {_uid(u.name)}["{_label(u.name)}<br/><small>{type(u).__name__}</small>"]')
 
-    # ストリーム（連続線 + 中央の番号バッジ）
+    # ストリーム（連続線 + 中央のマーカー）
     for key, number, s in _numbered_streams(units):
         producers = [u for u in units if s in u.outlets]
         consumers = [u for u in units if s in u.inlets]
-        lbl = f"{_badge(number)} {_label(s.name)}".strip()
+        lbl, is_html = _stream_label(number, s.name, style)
+        edge = f'|"{lbl}"|' if is_html else f"|{lbl}|"
         if producers and consumers:
             for p in producers:
                 for c in consumers:
-                    lines.append(f"    {_uid(p.name)} -->|{lbl}| {_uid(c.name)}")
+                    lines.append(f"    {_uid(p.name)} -->{edge} {_uid(c.name)}")
         elif consumers:  # フィード（生産者なし）: 始点に小さな丸
             src = f"IN_{key}"
             lines.append(f"    {src}(( )):::feed")
             for c in consumers:
-                lines.append(f"    {src} -->|{lbl}| {_uid(c.name)}")
+                lines.append(f"    {src} -->{edge} {_uid(c.name)}")
         elif producers:  # プロダクト（消費者なし）: 終点に小さな丸
             snk = f"OUT_{key}"
             lines.append(f"    {snk}(( )):::product")
             for p in producers:
-                lines.append(f"    {_uid(p.name)} -->|{lbl}| {snk}")
+                lines.append(f"    {_uid(p.name)} -->{edge} {snk}")
 
     lines.append("    classDef feed fill:#1976d2,stroke:#0d47a1,color:#fff;")
     lines.append("    classDef product fill:#388e3c,stroke:#1b5e20,color:#fff;")
@@ -103,7 +131,8 @@ _HTML = """<!doctype html>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{title}</title>
 <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
-<script>mermaid.initialize({{ startOnLoad: true, theme: "default" }});</script>
+<script>mermaid.initialize({{ startOnLoad: true, theme: "default",
+  securityLevel: "{security}", flowchart: {{ htmlLabels: true }} }});</script>
 <style>
   body{{font-family:sans-serif;margin:2rem}}
   h1{{font-size:1.2rem}}
@@ -111,6 +140,8 @@ _HTML = """<!doctype html>
   th,td{{border:1px solid #ccc;padding:2px 10px;text-align:left}}
   th{{background:#f5f5f5}}
   .legend{{margin-top:1.5rem}}
+  /* diamond スタイル: エッジラベルの既定背景を消し、白いひし形だけを見せる */
+  .edgeLabel, .edgeLabel p {{ background: transparent !important; }}
 </style>
 </head>
 <body>
@@ -129,17 +160,28 @@ _HTML = """<!doctype html>
 """
 
 
-def export_mermaid(source, path: str, *, title: str = "chemflow2 flowsheet", direction: str = "LR") -> str:
+def export_mermaid(
+    source,
+    path: str,
+    *,
+    title: str = "chemflow2 flowsheet",
+    direction: str = "LR",
+    style: str = "badge",
+) -> str:
     """Mermaid 図を自己完結 HTML（番号↔名前の凡例表つき）として書き出す。
+
+    style="badge"（既定）… 丸数字 + 名前。
+    style="diamond" … 線の中央に番号入りの白いひし形（SVG）。securityLevel:'loose' を使う。
 
     生成した Mermaid ソースを返す。
     """
     units = _units(source)
-    src = generate_mermaid(units, direction=direction)
+    src = generate_mermaid(units, direction=direction, style=style)
+    security = "loose" if style == "diamond" else "strict"
     rows = "\n".join(
         f"<tr><td>{_badge(number)} {number}</td><td>{_label(s.name)}</td></tr>"
         for _key, number, s in _numbered_streams(units)
     )
     with open(path, "w", encoding="utf-8") as fh:
-        fh.write(_HTML.format(title=title, src=src, legend=rows))
+        fh.write(_HTML.format(title=title, src=src, legend=rows, security=security))
     return src
