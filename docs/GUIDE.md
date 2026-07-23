@@ -310,8 +310,11 @@ print(generate_mermaid(problem))              # Mermaid ソース文字列（Mar
 export_mermaid(problem, "flow.html", title="My Flowsheet")  # 自己完結 HTML
 ```
 
-`stream_table` / 出力はすべて `Stream.order` の昇順で並ぶ。Mermaid はフィード・プロダクト・
-循環ループを自動で描き分ける。
+`stream_table` / 出力はすべて `Stream.order` の昇順で並ぶ。
+
+Mermaid は **PFD 式**（ストリームを番号入りのひし形、装置を矩形）で描く。番号は `Stream.order`、
+フィード（青）/プロダクト（緑）/循環を自動で描き分ける。番号と名前の対応は `export_mermaid` が
+HTML に出力する凡例表、または `stream_table` を参照。`order` を付けておくと図の番号が意味を持つ。
 
 ---
 

@@ -34,7 +34,7 @@ chemflow2/
 └── io/           出力
     ├── table.py       テキスト表 / CSV
     ├── excel.py       Excel(.xlsx) 出力（オプション依存）
-    └── diagram.py     Mermaid フロー図（ソース文字列 / 自己完結 HTML）
+    └── diagram.py     Mermaid フロー図（PFD 式・番号ひし形 / 凡例つき HTML）
 ```
 
 ### Separator と Splitter の使い分け
@@ -114,13 +114,17 @@ G1 = GibbsReactor(inlet=Feed, outlet=Out, species=["CH4","H2O","CO","CO2","H2"],
                   T=850, P="0.1MPa")   # T[°C] / P は "2MPaG" 等も可
 ```
 
-### フロー図の出力
+### フロー図の出力（PFD 式）
+
+実 PFD の流儀で、ストリームを **番号入りのひし形**（番号 = `Stream.order`）、装置を矩形で描く。
+フィード（青）/プロダクト（緑）/循環を自動で描き分ける。番号↔名前の対応は HTML の凡例表と
+`stream_table` を参照。
 
 ```python
 from chemflow2 import generate_mermaid, export_mermaid
 
 print(generate_mermaid(problem))                       # Mermaid ソース文字列
-export_mermaid(problem, "flow.html", title="My Flow")  # ブラウザで開ける HTML
+export_mermaid(problem, "flow.html", title="My Flow")  # 凡例表つき HTML
 ```
 
 ## 新しい装置を足す

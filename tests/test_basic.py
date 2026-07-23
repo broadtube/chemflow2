@@ -157,20 +157,22 @@ def test_recycle_with_splitter():
 
 def test_generate_mermaid_shows_loop():
     comps = ["N2O4", "NO2"]
-    feed = Stream(comps, flows={"N2O4": 10, "NO2": 0}, name="Feed")
-    rec = Stream(comps, name="Recycle")
-    mixed = Stream(comps, name="Mixed")
-    rout = Stream(comps, name="ReactOut")
-    prod = Stream(comps, name="Product")
+    feed = Stream(comps, flows={"N2O4": 10, "NO2": 0}, name="Feed", order=1)
+    mixed = Stream(comps, name="Mixed", order=2)
+    rout = Stream(comps, name="ReactOut", order=3)
+    prod = Stream(comps, name="Product", order=4)
+    rec = Stream(comps, name="Recycle", order=5)
     rxn = Reaction({"N2O4": -1, "NO2": 2})
     m = Mixer([feed, rec], mixed, name="M1")
     r = Reactor(mixed, rout, [rxn], key_component="N2O4", conversion=0.5, name="R1")
     sp = Splitter(rout, [prod, rec], ratios=[0.7, 0.3], name="SP1")
     src = generate_mermaid(Problem([feed, rec, mixed, rout, prod], [m, r, sp]))
     assert "flowchart" in src
-    assert "feed_Feed" in src          # フィードノード
-    assert "prod_Product" in src       # プロダクトノード
-    assert "U_SP1 -->|Recycle| U_M1" in src  # 循環エッジ
+    assert 'ST1{"1"}:::feed' in src        # Feed(order=1) は番号ひし形・フィード色
+    assert 'ST4{"4"}:::product' in src     # Product(order=4) はプロダクト色
+    # 循環: Recycle(order=5) のひし形を介して SP1 → ST5 → M1 のループ
+    assert "U_SP1 --> ST5" in src
+    assert "ST5 --> U_M1" in src
 
 
 def test_parse_pressure():
