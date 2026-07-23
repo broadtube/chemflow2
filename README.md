@@ -34,7 +34,7 @@ chemflow2/
 └── io/           出力
     ├── table.py       テキスト表 / CSV
     ├── excel.py       Excel(.xlsx) 出力（オプション依存）
-    └── diagram.py     Mermaid フロー図（PFD 式・番号ひし形 / 凡例つき HTML）
+    └── diagram.py     Mermaid フロー図（連続線 + 番号バッジ / 凡例つき HTML）
 ```
 
 ### Separator と Splitter の使い分け
@@ -114,11 +114,14 @@ G1 = GibbsReactor(inlet=Feed, outlet=Out, species=["CH4","H2O","CO","CO2","H2"],
                   T=850, P="0.1MPa")   # T[°C] / P は "2MPaG" 等も可
 ```
 
-### フロー図の出力（PFD 式）
+### フロー図の出力
 
-実 PFD の流儀で、ストリームを **番号入りのひし形**（番号 = `Stream.order`）、装置を矩形で描く。
-フィード（青）/プロダクト（緑）/循環を自動で描き分ける。番号↔名前の対応は HTML の凡例表と
-`stream_table` を参照。
+ストリームを **連続線の中央に乗る番号バッジ**（丸数字 + 名前、番号 = `Stream.order`）、
+装置を矩形で描く。フィード（青丸）/プロダクト（緑丸）を端点に置き、循環は 1 本の連続線になる。
+番号↔名前の対応は HTML の凡例表と `stream_table` を参照。
+
+> Mermaid の構造上、線の途中に図形ノード（ひし形）を「乗せる」ことはできないため、
+> 番号はエッジラベルとして中央に表示する。真のひし形マーカーが必要なら SVG 直描画が別途必要。
 
 ```python
 from chemflow2 import generate_mermaid, export_mermaid

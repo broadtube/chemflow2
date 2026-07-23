@@ -168,11 +168,15 @@ def test_generate_mermaid_shows_loop():
     sp = Splitter(rout, [prod, rec], ratios=[0.7, 0.3], name="SP1")
     src = generate_mermaid(Problem([feed, rec, mixed, rout, prod], [m, r, sp]))
     assert "flowchart" in src
-    assert 'ST1{"1"}:::feed' in src        # Feed(order=1) は番号ひし形・フィード色
-    assert 'ST4{"4"}:::product' in src     # Product(order=4) はプロダクト色
-    # 循環: Recycle(order=5) のひし形を介して SP1 → ST5 → M1 のループ
-    assert "U_SP1 --> ST5" in src
-    assert "ST5 --> U_M1" in src
+    assert ":::feed" in src and ":::product" in src   # 境界に色付き端点
+    # ストリームはエッジラベル（丸数字 + 名前）。ひし形ノードは使わない
+    assert "{" not in src.replace("initialize", "")   # 装置は [] ノードのみ
+    # 循環: Recycle(order=5) は 1 本の連続線（中央に ⑤）で SP1 → M1
+    circled5 = chr(0x2460 + 4)  # ⑤
+    assert f"U_SP1 -->|{circled5} Recycle| U_M1" in src
+    # フィード(①)・プロダクト(④)の端点エッジ
+    assert f"|{chr(0x2460)} Feed|" in src
+    assert f"|{chr(0x2460 + 3)} Product|" in src
 
 
 def test_parse_pressure():

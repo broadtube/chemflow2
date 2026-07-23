@@ -312,9 +312,13 @@ export_mermaid(problem, "flow.html", title="My Flowsheet")  # 自己完結 HTML
 
 `stream_table` / 出力はすべて `Stream.order` の昇順で並ぶ。
 
-Mermaid は **PFD 式**（ストリームを番号入りのひし形、装置を矩形）で描く。番号は `Stream.order`、
-フィード（青）/プロダクト（緑）/循環を自動で描き分ける。番号と名前の対応は `export_mermaid` が
-HTML に出力する凡例表、または `stream_table` を参照。`order` を付けておくと図の番号が意味を持つ。
+Mermaid はストリームを **連続線の中央に乗る番号バッジ**（丸数字 + 名前、番号 = `Stream.order`）、
+装置を矩形で描く。フィード（青丸）/プロダクト（緑丸）を端点に置き、循環は 1 本の連続線になる。
+番号と名前の対応は `export_mermaid` が HTML に出力する凡例表、または `stream_table` を参照。
+`order` を付けておくと図の番号が意味を持つ。
+
+（Mermaid は線の途中に図形ノードを乗せられないため、番号はエッジラベルで表示する。
+真のひし形マーカーを線上に描きたい場合は SVG 直描画が必要で、Mermaid の範囲外。）
 
 ---
 
