@@ -429,4 +429,5 @@ G = GibbsReactor(Feed, Out, species=["CH4","H2O","CO","CO2","H2"], T=850, P="0.1
 | `example_diagram.py` | Mermaid フロー図の出力 |
 | `example_multibasis.py` | 多 basis 出力（mol/h・g/h・NL/h・分率） |
 | `example_plant.py` | 合成ガス多段プラント（反応 + 凝縮 + 2 分離塔 + 循環 2 系統） |
+| `example_plant2.py` | 上記 + メタノール脱水反応（CH3OH-key の反応器を直列追加。MeOH 循環がパージ無しで閉じる） |
 | `example_excel.py` | Excel 出力（要 openpyxl） |
