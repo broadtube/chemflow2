@@ -84,12 +84,39 @@ def _numbered_streams(units: list) -> list[tuple[str, object, Stream]]:
     return result
 
 
-def generate_mermaid(source, *, direction: str = "LR", style: str = "badge") -> str:
+def _unit_chain(units: list) -> list:
+    """後退辺を無視したトポロジカル順に装置を並べる（循環は宣言順で断ち切る）。"""
+    idx = {id(u): i for i, u in enumerate(units)}
+    preds = {id(u): set() for u in units}
+    for p in units:
+        for c in units:
+            if p is c:
+                continue
+            if any(s in c.inlets for s in p.outlets):
+                preds[id(c)].add(id(p))
+    order: list = []
+    remaining = list(units)
+    while remaining:
+        left = {id(u) for u in remaining}
+        ready = [u for u in remaining if not (preds[id(u)] & left)]
+        pick = min(ready or remaining, key=lambda u: idx[id(u)])
+        order.append(pick)
+        remaining.remove(pick)
+    return order
+
+
+def generate_mermaid(source, *, direction: str = "LR", style: str = "badge",
+                     rank_chain: bool = True) -> str:
     """Problem もしくは units リストから Mermaid flowchart を生成する。
 
     style="badge"（既定）… 連続線の中央に丸数字 + 名前。ポータブル（GitHub 等でも描画）。
     style="diamond" … 線の中央に番号入りの白いひし形（SVG）。要 securityLevel:'loose'
         なので export_mermaid の HTML でのみ正しく描画される。
+
+    rank_chain=True（既定）… 装置をトポロジカル順につなぐ**不可視エッジ**（``~~~``）を
+        張る。Mermaid 既定の dagre は循環ストリームの帰還エッジを平気で装置ノードの
+        上に重ねて描くため（例: 分流器→混合器の線が分離塔にかぶる）、各装置を別ランクに
+        分けて帰還エッジの通り道を空ける。線は描画されず、配置だけに効く。
     """
     units = _units(source)
     lines = [f"flowchart {direction}"]
@@ -118,6 +145,12 @@ def generate_mermaid(source, *, direction: str = "LR", style: str = "badge") -> 
             lines.append(f"    {snk}(( )):::product")
             for p in producers:
                 lines.append(f"    {_uid(p.name)} -->{edge} {snk}")
+
+    # 配置専用の不可視エッジ（帰還エッジの通り道を空ける）
+    if rank_chain:
+        chain = _unit_chain(units)
+        for a, b in zip(chain, chain[1:]):
+            lines.append(f"    {_uid(a.name)} ~~~ {_uid(b.name)}")
 
     lines.append("    classDef feed fill:#1976d2,stroke:#0d47a1,color:#fff;")
     lines.append("    classDef product fill:#388e3c,stroke:#1b5e20,color:#fff;")
@@ -168,16 +201,18 @@ def export_mermaid(
     title: str = "chemflow2 flowsheet",
     direction: str = "LR",
     style: str = "badge",
+    rank_chain: bool = True,
 ) -> str:
     """Mermaid 図を自己完結 HTML（番号↔名前の凡例表つき）として書き出す。
 
     style="badge"（既定）… 丸数字 + 名前。
     style="diamond" … 線の中央に番号入りの白いひし形（SVG）。securityLevel:'loose' を使う。
+    rank_chain … generate_mermaid と同じ（既定 True: 帰還エッジの重なりを避ける）。
 
     生成した Mermaid ソースを返す。
     """
     units = _units(source)
-    src = generate_mermaid(units, direction=direction, style=style)
+    src = generate_mermaid(units, direction=direction, style=style, rank_chain=rank_chain)
     security = "loose" if style == "diamond" else "strict"
     rows = "\n".join(
         f"<tr><td>{_badge(number)} {number}</td><td>{_label(s.name)}</td></tr>"
