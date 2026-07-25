@@ -118,6 +118,13 @@ class KineticReactor(Unit):
         self._pfr = pfr
         self._bed = CatalystBed(self.masses, acid_site_density=self.acid_site_density)
 
+        # 直前の (入口ベクトル → 出口予測) を1件だけ保持する。数値ヤコビアンでは
+        # 本 Unit と無関係な変数を動かす評価が大半を占め、そのとき入口は前回と
+        # 完全同一になる。PFR は入口の純関数なので積分を丸ごと省略できる。
+        self._cache_key: bytes | None = None
+        self._cache_val: np.ndarray | None = None
+        self.n_pfr_calls = 0        # 実際に積分した回数（診断用）
+
     # ------------------------------------------------------------------ #
     @property
     def inlets(self) -> list[Stream]:
@@ -131,21 +138,34 @@ class KineticReactor(Unit):
         """chemflow2 実式 → reaction_rate 種キー。"""
         return self.species_alias.get(formula, formula)
 
+    def _predict(self, inlet_molar: np.ndarray, all_formulas: list[str],
+                 out_formulas: list[str]) -> np.ndarray:
+        """入口モル流ベクトル → PFR 出口予測（out_formulas 順・mol/h）。入口の純関数。"""
+        key = inlet_molar.tobytes()
+        if key == self._cache_key:
+            return self._cache_val
+
+        if inlet_molar.sum() <= 0:
+            predicted = np.zeros(len(out_formulas))   # 入口ゼロ → 出口ゼロ
+        else:
+            # pfr 入口: reaction_rate キーで mol/s（活性種は 0 でも含める）
+            F_in = {self._to_rr(f): v * self.flow_to_mol_s
+                    for f, v in zip(all_formulas, inlet_molar)}
+            result = self._pfr(
+                F_in, self.T_kelvin, self.P_bar, self._bed,
+                models=self.models, k_eq3=self.k_eq3, n_points=self.n_points,
+            )
+            self.n_pfr_calls += 1
+            out = result.outlet()  # reaction_rate キー, mol/s
+            predicted = np.array([out.get(self._to_rr(f), 0.0) / self.flow_to_mol_s
+                                  for f in out_formulas])
+
+        self._cache_key, self._cache_val = key, predicted
+        return predicted
+
     def residuals(self) -> np.ndarray:
         out_formulas = self._outlet.formulas
         all_formulas = component_union([self._inlet, self._outlet])
-
-        # pfr 入口: reaction_rate キーで mol/s（活性種は 0 でも含める）
-        F_in = {self._to_rr(f): self._inlet.flow_of(f) * self.flow_to_mol_s for f in all_formulas}
-
-        outlet_molar = flows_on(self._outlet, out_formulas)
-        if sum(F_in.values()) <= 0:
-            return outlet_molar  # 入口ゼロ → 出口ゼロ
-
-        result = self._pfr(
-            F_in, self.T_kelvin, self.P_bar, self._bed,
-            models=self.models, k_eq3=self.k_eq3, n_points=self.n_points,
-        )
-        out = result.outlet()  # reaction_rate キー, mol/s
-        predicted = np.array([out.get(self._to_rr(f), 0.0) / self.flow_to_mol_s for f in out_formulas])
-        return outlet_molar - predicted
+        inlet_molar = flows_on(self._inlet, all_formulas)
+        predicted = self._predict(inlet_molar, all_formulas, out_formulas)
+        return flows_on(self._outlet, out_formulas) - predicted
