@@ -17,10 +17,12 @@ from typing import Callable
 import numpy as np
 from scipy.optimize import least_squares, root
 
-from chemflow2.core.errors import SolveError
+from chemflow2.core.errors import ConstraintError, SolveError
 from chemflow2.core.expr import Expr, value_of
+from chemflow2.core.pressure import parse_pressure
 from chemflow2.core.stream import Stream
 from chemflow2.core.unit import Unit
+from chemflow2.core.vle import antoine_water_psat, henry_pa
 
 
 class Constraint:
@@ -109,6 +111,102 @@ class Problem:
                     lambda f=formula, r=frac: np.atleast_1d(outlet.flow_of(f) - r * inlet.flow_of(f)),
                     label,
                 )
+            )
+
+    def constrain_saturation(
+        self,
+        gas: Stream,
+        formula: str = "H2O",
+        *,
+        T: float,
+        P: float | str,
+        psat: float | None = None,
+        name: str | None = None,
+    ) -> None:
+        """ガス側の成分を飽和量に固定する（**方程式 1 本**）。
+
+            gas(formula) = y_sat/(1 − y_sat) · Σ gas(formula 以外)
+            y_sat = P_sat(T) / P
+
+        凝縮器を Separator（収支のみ）で組み、その分配を物理で閉じるための制約。
+        ``constrain_recovery`` の物性版で、混ぜて使える（例: 水は飽和で決め、
+        有機物は回収率で指定）。
+
+            Cond = Separator(ReactOut, [DryGas, Condensate])
+            problem.constrain_saturation(DryGas, "H2O", T=25, P="1.04MPaG")
+
+        psat を渡せば内蔵テーブルに無い成分にも使える（既定は水の Antoine 式）。
+        """
+        if formula not in gas.index:
+            raise ConstraintError(f"{gas.name!r} に成分 {formula!r} がありません")
+        if psat is None:
+            if formula != "H2O":
+                raise ConstraintError(
+                    f"{formula!r} の飽和蒸気圧は内蔵していません。psat=[Pa] を渡してください"
+                )
+            psat = antoine_water_psat(T)
+        y_sat = psat / parse_pressure(P)
+        if not 0.0 < y_sat < 1.0:
+            raise ConstraintError(f"飽和モル分率が範囲外です: y_sat={y_sat:.4g}（T・P を確認）")
+        ratio = y_sat / (1.0 - y_sat)
+        i = gas.index[formula]
+
+        def fn() -> np.ndarray:
+            others = gas.molar_flows.sum() - gas.molar_flows[i]
+            return np.atleast_1d(gas.molar_flows[i] - ratio * others)
+
+        self.constraints.append(
+            Constraint(fn, name or f"saturation[{formula}] {gas.name} @{T}°C")
+        )
+
+    def constrain_henry(
+        self,
+        gas: Stream,
+        liquid: Stream,
+        formulas: list[str],
+        *,
+        T: float,
+        P: float | str,
+        solvent: str = "H2O",
+        henry: dict[str, float] | None = None,
+        name: str | None = None,
+    ) -> None:
+        """Henry 則で気体の液相への溶解量を決める（**方程式 = len(formulas) 本**）。
+
+            liquid(i) = x_i · liquid(solvent),  x_i = p_i / H_i,  p_i = gas(i)/Σgas · P
+
+        H_i は Sander 2023 の内蔵テーブルから van't Hoff 式で温度補正して求める
+        （`chemflow2.core.vle.HENRY_DATA`）。henry={成分: H[Pa]} で上書きできる。
+        テーブルに無く上書きも無い成分は「溶けない」= liquid(i) = 0 とする。
+        """
+        P_pa = parse_pressure(P)
+        overrides = henry or {}
+        if solvent not in liquid.index:
+            raise ConstraintError(f"{liquid.name!r} に溶媒 {solvent!r} がありません")
+        j_solvent = liquid.index[solvent]
+
+        for f in formulas:
+            if f == solvent:
+                raise ConstraintError(f"溶媒 {solvent!r} 自身は constrain_henry の対象にできません")
+            if f not in liquid.index:
+                raise ConstraintError(f"{liquid.name!r} に成分 {f!r} がありません")
+            H = overrides.get(f, henry_pa(f, T))
+            j = liquid.index[f]
+            i = gas.index.get(f)
+
+            def fn(j=j, i=i, H=H) -> np.ndarray:
+                liq_i = liquid.molar_flows[j]
+                if H is None:                       # 溶解データ無し → 溶けない
+                    return np.atleast_1d(liq_i)
+                gas_i = gas.molar_flows[i] if i is not None else 0.0
+                gas_total = gas.molar_flows.sum()
+                # 反復の途中でガスが空になっても壊れないようにする
+                y_i = gas_i / gas_total if abs(gas_total) > 1e-12 else 0.0
+                dissolved = y_i * (P_pa / H) * abs(liquid.molar_flows[j_solvent])
+                return np.atleast_1d(liq_i - dissolved)
+
+            self.constraints.append(
+                Constraint(fn, name or f"henry[{f}] {gas.name}->{liquid.name} @{T}°C")
             )
 
     def constrain_fracs(self, stream: Stream, fracs: dict[str, float], *, name: str | None = None) -> None:
