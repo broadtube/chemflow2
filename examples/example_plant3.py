@@ -79,15 +79,21 @@ def volume_for(n_molh: float) -> float:
     return n_molh * VM_STP / SV
 
 
-def build(v_tot: float, seed: dict[str, np.ndarray] | None = None):
-    """全触媒体積 v_tot [m³] のフローシートを組む。seed は前回解（初期推定）。"""
+def build(v_tot: float, seed: dict[str, np.ndarray] | None = None,
+          feed: dict[str, float] | None = None):
+    """全触媒体積 v_tot [m³] のフローシートを組む。
+
+    seed は前回解（初期推定）。feed を渡すと新鮮供給の組成を差し替えられる
+    （前工程 pattern1 の DryGas をそのまま流し込むため。既定は STEAM1）。
+    """
 
     def S(i: int, cond: StreamCondition = gas) -> Stream:
         nm = NAMES[i - 1]
         return Stream(C, name=nm, order=i, condition=cond,
                       guess=seed.get(nm) if seed else None)
 
-    Steam1      = Stream(C, name=NAMES[0], order=1, condition=gas, flows=STEAM1)
+    Steam1      = Stream(C, name=NAMES[0], order=1, condition=gas,
+                         flows=feed if feed is not None else STEAM1)
     ReactorIn   = S(2)
     HybridOut   = S(3)          # ハイブリッド床（合成＋脱水）の出口
     ReactorOut  = S(4)          # カルボニル化床の出口
@@ -145,18 +151,21 @@ def build(v_tot: float, seed: dict[str, np.ndarray] | None = None):
 RECYCLE_GUESS = 6.5
 
 
-def solve_with_sv(max_outer: int = 8, tol: float = 1e-4, verbose: bool = True):
+def solve_with_sv(max_outer: int = 8, tol: float = 1e-4, verbose: bool = True,
+                  feed: dict[str, float] | None = None):
     """SV 一定（反応器入口基準）になるまで触媒体積 V を外側反復して解く。
 
     g(V) = volume_for(反応器入口流量(V)) − V の零点を**割線法**で探す。
     単純な減衰付き固定点反復だと 1 回の求解が数分かかるのに 6〜8 回必要になるため。
     各求解は前回解をそのまま初期推定に使う（ウォームスタート）。
+    feed で新鮮供給の組成を差し替えられる（既定は STEAM1）。
     """
+    feed = feed if feed is not None else STEAM1
     state: dict[str, object] = {}
 
     def g(v: float, it: int) -> float:
         t0 = time.time()
-        problem, streams = build(v, state.get("seed"))
+        problem, streams = build(v, state.get("seed"), feed=feed)
         if it == 1 and verbose:
             print("自由度 (変数, 方程式):", problem.degrees_of_freedom())
         sol = problem.solve(bounds=(0, np.inf), tol=1e-6,
@@ -174,7 +183,7 @@ def solve_with_sv(max_outer: int = 8, tol: float = 1e-4, verbose: bool = True):
                   f"({time.time()-t0:.1f}s, PFR積分 {n_pfr}回, nfev={sol.nfev})")
         return v_new - v
 
-    v_prev = volume_for(RECYCLE_GUESS * sum(STEAM1.values()))
+    v_prev = volume_for(RECYCLE_GUESS * sum(feed.values()))
     g_prev = g(v_prev, 1)
     if abs(g_prev) <= tol * v_prev:
         return state["problem"], state["streams"], v_prev
