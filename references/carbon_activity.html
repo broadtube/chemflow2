@@ -174,13 +174,21 @@
       本プロジェクトでの利用元: Mikuriya, Yagi, Shimura, <i>AIChE Annual Meeting</i> 2008 · <code>Mikuriya_Yagi_Shimura_2008_AIChE_CO2_H2O_reforming.pdf</code></p>
 
     <div class="note acc">
-      <p class="h">✅ 定義式は千代田自身の特許で確認できた</p>
+      <p class="h">✅ 定義式は千代田自身の特許で確認できた — WO2012140994A1【0067】〜【0068】</p>
       <p>AIChE 2008 は等高線 “Carbon Activity = 1” を示すだけで式を書いていないが、同社の特許
-        <b>WO2012140994A1</b>（発明者 坂口順一, 優先日 2011-04-12, 「CO₂ を排出しない合成ガスの製造方法」）に定義式が明記されている:</p>
-      <p><b>「カーボン活性＝Ｋ×（Ｐco）²／（Ｐco2）」「このカーボン活性の値が１を超えると触媒上にカーボンが析出しやすくなる。」</b></p>
-      <p>これは下記 <b>B（Boudouard 経路）そのもの</b>。千代田は Boudouard 1 本で定義しているが、§2 のとおり
-        <b>平衡気相では 3 経路が一致する</b>ので、改質器出口に適用する限り本実装（3 経路の最大値）と同値。
-        ⚠️ 引用は Google Patents のテキスト層から。保存した PDF は全 32 頁ともスキャン画像でテキスト層が無い。</p>
+        <b>WO2012140994A1</b>（発明者 坂口順一, 優先日 2011-04-12, 「CO₂ を排出しない合成ガスの製造方法」,
+        PCT/JP2012/057127）の<b>実施例セクション、公報 19 頁（PDF 21 頁目）</b>に定義式が明記されている。
+        原文（PDF から直読）:</p>
+      <p>【0067】…また、<b>カーボン活性</b>とは、下記式４で表されるものであり、この<b>カーボン活性の値が１を超えると触媒上にカーボンが析出しやすくなる</b>。<br>
+        【0068】［式４］ <b>カーボン活性＝Ｋ×（Ｐco）²／（Ｐco₂）</b><br>
+        ここで、<b>Ｋは２ＣＯ＝Ｃ＋ＣＯ₂の反応の平衡定数</b>であり、Ｐxは成分xの分圧である。</p>
+      <p>K の中身まで明示されており、これは下記 <b>B（Boudouard 経路）そのもの</b>。千代田は Boudouard 1 本で
+        定義しているが、§2 のとおり<b>平衡気相では 3 経路が一致する</b>ので、改質器出口に適用する限り
+        本実装（3 経路の最大値）と同値。分圧の単位は明記されていないが、Boudouard の K が無次元である以上
+        atm 基準と解釈するほかなく、本実装と整合する。</p>
+      <p>⚠️ 保存 PDF は全 32 頁ともスキャン画像でテキスト層が無いため、位置の特定はページを画像化して目視で行った。
+        なお <b>Google Patents はこの箇所を【0091】/ 全 92 段落と表示するが誤り</b>。この WO 公報の明細書は
+        <b>【0075】（符号の説明）で終わっている</b>。ファミリー他文献のテキストが混在しているものと思われる。</p>
     </div>
 
     <p>a<sub>C</sub> は「その気相と平衡にある固体炭素（黒鉛）の活量」。固体炭素を生む反応それぞれについて、<b>固体炭素の活量を未知数として平衡式を解く</b>と得られる。</p>
@@ -507,8 +515,32 @@
     <div class="note">
       <p class="h">千代田化工の立ち位置 — a_C ≤ 1 は同社触媒を前提にしない条件</p>
       <p>AIChE 2008 原文: “operations on the <b>left side of the carbon limit curve are more economical</b> … But in these conditions, product synthesis gases have <b>high thermodynamic potential for carbon formation</b>. In our process, feed gas conditions on the left side of carbon limit line <b>could be selected because our catalyst has high resistance against carbon formation</b>.”</p>
-      <p>つまり CT-CO2AR® は「a<sub>C</sub> ≤ 1 を守る技術」ではなく <b>「a<sub>C</sub> &gt; 1 の領域でも運転できる触媒」</b>。したがって本プロジェクトが課している a<sub>C</sub> ≤ 1 は、<b>同社触媒を前提にしない保守的な条件</b>にあたる。</p>
+      <p>つまり CT-CO2AR® の売りは <b>「a<sub>C</sub> &gt; 1 の領域でも運転できる触媒耐性」</b>にある。</p>
+      <p><b>ただし同社の設計実務はそうではない。</b> 特許 WO2012140994A1 の表 5（公報 20 頁）を見ると、
+        <b>実施例 1〜4 のすべてで「出口のカーボン活性」を 0.90 に設計している</b>（下表）。
+        触媒耐性を余裕として持ちつつ、<b>プロセス設計としては a<sub>C</sub> &lt; 1 を守っている</b>。
+        <b>本プロジェクトが課す a<sub>C</sub> ≤ 1 は、千代田の設計実務と一致する</b>。</p>
     </div>
+
+    <div class="tbl-scroll">
+      <table>
+        <caption>特許 WO2012140994A1 表 5（公報 20 頁）— 実施例の運転条件と出口カーボン活性</caption>
+        <thead><tr><th>項目</th><th>単位</th><th>実施例 1</th><th>実施例 2</th><th>実施例 3</th><th>実施例 4</th></tr></thead>
+        <tbody>
+          <tr><td>S/C モル比</td><td>−</td><td>4.0</td><td class="match">0.85</td><td>4.0</td><td>−</td></tr>
+          <tr><td>CO₂/炭素 モル比</td><td>−</td><td>9.6</td><td>0.82</td><td>9.4</td><td>2.4</td></tr>
+          <tr><td>H₂/CO モル比</td><td>−</td><td>2.0</td><td>2.0</td><td>2.0</td><td>0.5</td></tr>
+          <tr><td>メタン含有率</td><td>vol%</td><td>10</td><td>10</td><td>10</td><td>2.8</td></tr>
+          <tr><td>リフォーマー入口/出口温度</td><td>℃</td><td>500/550</td><td class="match">500/850</td><td>500/550</td><td>500/850</td></tr>
+          <tr><td>リフォーマー出口圧力</td><td>MPaG</td><td>0.15</td><td class="match">2.00</td><td>0.15</td><td>1.3</td></tr>
+          <tr><td>GHSV</td><td>1/h</td><td>5950</td><td>265</td><td>5540</td><td>209</td></tr>
+          <tr><td><b>出口のカーボン活性</b></td><td>−</td><td class="match"><b>0.90</b></td><td class="match"><b>0.90</b></td><td class="match"><b>0.90</b></td><td class="match"><b>0.90</b></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p><b>実施例 2 が本プロジェクトの検討条件に最も近い</b>（850 ℃・2.0 MPaG・S/C 0.85 の低水蒸気）。
+      こちらの検討（900 ℃・1.04 MPaG・H₂O/CH₄ = 0.72）と同じ領域を、a<sub>C</sub> = 0.90 に収めている。</p>
   </section>
 
   <!-- ============ 実装 ============ -->
@@ -572,7 +604,7 @@ problem.constrain_carbon_activity(ReactOut, 1.0, T=900, P="1.04MPaG")   # 制約
     <p class="foot-grp">§4 本プロジェクトでの利用元（千代田化工建設）</p>
     <ul>
       <li><span class="f">Mikuriya_Yagi_Shimura_2008_AIChE_CO2_H2O_reforming.pdf ✅取得済</span><span class="d">T. Mikuriya, F. Yagi, M. Shimura. “Development of a new Synthesis Gas Production Catalyst and Process with CO₂ and H₂O Reforming.” <i>AIChE Annual Meeting</i>, Philadelphia, PA, Nov. 16–21 (2008), 8 pp. 〔DOI なし（会議発表）。<b>Fig.4 に “Carbon Activity = 1” の等高線</b>。定義式は書かれておらず出典は参考文献 4〕</span></li>
-      <li><span class="f">WO2012140994A1_Chiyoda_syngas.pdf ✅取得済</span><span class="d">坂口 順一（千代田化工建設）.「ＣＯ₂を排出しない合成ガスの製造方法」<b>WO2012140994A1</b>, 優先日 2011-04-12, 公開 2012-10-18, 32 pp. 〔DOI なし（特許）。<b>定義式「カーボン活性＝Ｋ×（Ｐco)²／（Ｐco2)」と「値が１を超えると触媒上にカーボンが析出しやすくなる」を明記＝千代田自身の定義が確認できる唯一の資料</b>。⚠️ 保存 PDF は全 32 頁ともスキャン画像でテキスト層なし。引用は Google Patents のテキスト層から〕</span></li>
+      <li><span class="f">WO2012140994A1_Chiyoda_syngas.pdf ✅取得済</span><span class="d">坂口 順一（千代田化工建設）.「ＣＯ₂を排出しない合成ガスの製造方法」<b>WO2012140994A1</b>（PCT/JP2012/057127）, 優先日 2011-04-12, 公開 2012-10-18, 32 pp. 〔DOI なし（特許）。<b>【0067】〜【0068】（公報 19 頁 / PDF 21 頁目）に定義式「カーボン活性＝Ｋ×（Ｐco)²／（Ｐco2)、Ｋは２ＣＯ＝Ｃ＋ＣＯ₂の反応の平衡定数」と「値が１を超えると触媒上にカーボンが析出しやすくなる」を明記＝千代田自身の定義が確認できる唯一の資料</b>。<b>表 5（公報 20 頁）は実施例 1〜4 の出口カーボン活性をいずれも 0.90 と設計</b>。⚠️ 保存 PDF は全 32 頁ともスキャン画像でテキスト層なし（位置は画像化して目視特定）。⚠️ <b>Google Patents は当該箇所を【0091】/ 全 92 段落と表示するが誤り</b>——本公報の明細書は【0075】で終わる〕</span></li>
       <li><span class="f">未入手</span><span class="d">八木 冬樹. 「CO₂ を原料として合成ガスを製造する CO₂/H₂O リフォーミングプロセス」<i>触媒</i> <b>51</b>(5), 331–335 (2009). 〔DOI なし。日本語版。非オープンアクセス〕</span></li>
       <li><span class="f">未入手</span><span class="d">八木 冬樹. 「CO₂ を原料とする合成ガス製造プロセス」<i>ペトロテック</i> <b>34</b>(6), 378–383 (2011). 〔DOI なし。日本語版。非オープンアクセス〕</span></li>
       <li><span class="f">未入手</span><span class="d">八木 冬樹. 「CO₂ リフォーミングプロセスによる合成ガス製造」<i>日本エネルギー学会誌</i> <b>91</b>(4), 274–278 (2012). 〔DOI なし。日本語版。CiNii CRID 1520290882653584768。非オープンアクセス〕</span></li>
