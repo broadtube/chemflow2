@@ -173,6 +173,16 @@
       線図としての利用: Udengaard ら, <i>Oil &amp; Gas J.</i> <b>90</b>(10) 62–67 (1992) ·
       本プロジェクトでの利用元: Mikuriya, Yagi, Shimura, <i>AIChE Annual Meeting</i> 2008 · <code>Mikuriya_Yagi_Shimura_2008_AIChE_CO2_H2O_reforming.pdf</code></p>
 
+    <div class="note acc">
+      <p class="h">✅ 定義式は千代田自身の特許で確認できた</p>
+      <p>AIChE 2008 は等高線 “Carbon Activity = 1” を示すだけで式を書いていないが、同社の特許
+        <b>WO2012140994A1</b>（発明者 坂口順一, 優先日 2011-04-12, 「CO₂ を排出しない合成ガスの製造方法」）に定義式が明記されている:</p>
+      <p><b>「カーボン活性＝Ｋ×（Ｐco）²／（Ｐco2）」「このカーボン活性の値が１を超えると触媒上にカーボンが析出しやすくなる。」</b></p>
+      <p>これは下記 <b>B（Boudouard 経路）そのもの</b>。千代田は Boudouard 1 本で定義しているが、§2 のとおり
+        <b>平衡気相では 3 経路が一致する</b>ので、改質器出口に適用する限り本実装（3 経路の最大値）と同値。
+        ⚠️ 引用は Google Patents のテキスト層から。保存した PDF は全 32 頁ともスキャン画像でテキスト層が無い。</p>
+    </div>
+
     <p>a<sub>C</sub> は「その気相と平衡にある固体炭素（黒鉛）の活量」。固体炭素を生む反応それぞれについて、<b>固体炭素の活量を未知数として平衡式を解く</b>と得られる。</p>
 
     <ul class="rxns">
@@ -371,14 +381,83 @@
       <h2>5 &nbsp;黒鉛基準の限界 — ウィスカーカーボン</h2>
       <span class="tag">Rostrup-Nielsen</span>
     </div>
-    <p class="cite">一次出典: J. R. Rostrup-Nielsen, “Equilibria of decomposition reactions of carbon monoxide and methane over nickel catalysts”, <i>J. Catal.</i> <b>27</b> 343–356 (1972) · DOI 10.1016/0021-9517(72)90170-4 · <b>未入手</b></p>
+    <p class="cite">主根拠（<b>取得済み</b>）: J. R. Rostrup-Nielsen, J.-H. Bak Hansen, “CO₂-Reforming of Methane over Transition Metals”, <i>J. Catal.</i> <b>144</b> 38–49 (1993) · DOI 10.1006/jcat.1993.1312 · <code>rostrupnielsen1993.pdf</code>（全 12 頁・スキャン、テキスト層なし）·
+      概念の原著（未入手）: 同, <i>J. Catal.</i> <b>27</b> 343–356 (1972) · DOI 10.1016/0021-9517(72)90170-4</p>
 
-    <p><b>ここが実装上いちばん重要な留保。</b> Ni 触媒上で成長する炭素は<b>黒鉛ではなくウィスカー（フィラメント）状炭素</b>で、黒鉛より自由エネルギーが高い（＝不安定）。そのため <b>a<sub>C</sub> = 1（黒鉛基準）を超えても、すぐには析出しない</b>。Rostrup-Nielsen 1972 はこのずれを Ni・Ni-Cu 触媒で測定した原著で、CO + CO₂ 系のほうが CH₄ + H₂ 系よりずれが大きいことを示している。</p>
+    <p><b>ここが実装上いちばん重要な留保。</b> Ni 触媒上で成長する炭素は<b>黒鉛ではなくウィスカー（フィラメント）状炭素</b>で、黒鉛より自由エネルギーが高い（＝不安定）。そのため <b>a<sub>C</sub> = 1（黒鉛基準）を超えても、すぐには析出しない</b>。1993 年論文の abstract がこれを端的に述べている:</p>
 
-    <p>Alstrup らの粒子径依存性と組み合わせて、黒鉛からのずれは次の形で整理されている（二次資料による引用。<b>一次確認は未了</b>）。</p>
+    <div class="note acc">
+      <p class="h">Rostrup-Nielsen &amp; Bak Hansen 1993, abstract（原文）</p>
+      <p>“All catalysts show <b>smaller equilibrium constants for methane decomposition than that based on graphite, the effect being largest for the noble metals</b>. Ru and Rh show high selectivity for carbon-free operation, which can be ascribed to high reforming rates combined with low carbon formation rates. Similar high selectivity can be achieved with a sulfur-passivated nickel catalyst.”</p>
+    </div>
+
+    <p class="subhead">5.1 &nbsp;平衡定数は黒鉛より小さい — 粒子径と金属種で決まる</p>
+
+    <p>同論文 <b>§3.2 / Fig. 4</b>（TGA 実測の CH₄ 分解平衡定数 ln K<sub>p</sub> 対 1000/T）より:</p>
+    <div class="note acc">
+      <p>“All catalysts have equilibrium constants smaller than that calculated on a graphite basis. The <b>Ni-a</b> curve … corresponding to a <b>maximum nickel crystal size of ca. 300 nm</b>. The <b>Ni-b</b> curve … <b>maximum nickel crystal size below 10 nm. This results in a smaller equilibrium constant because of the higher surface energy of the whisker carbon.</b> <b>The noble metals have even smaller equilibrium constants.</b> Palladium shows a track different from the other metals.”</p>
+    </div>
+
+    <p>Fig. 4 の曲線は上から <b>Graphite &gt; Ni-a &gt; Ni-b &gt; Ni-1 &gt; Rh &gt; Ru &gt; Ir &gt; Pt &gt; Pd</b> の順。K が小さいほど析出しにくいので、<b>黒鉛が最も析出しやすく、貴金属ほど析出しにくい</b>。</p>
+
+    <div class="tbl-scroll">
+      <table>
+        <caption>Fig. 4 から読み取った a_C,crit ≈ K_graphite / K_metal（≈500 ℃）— 黒鉛基準の a_C がこの値を超えて初めて析出</caption>
+        <thead><tr><th>触媒</th><th>Ni-a<br>(300 nm)</th><th>Ni-b<br>(&lt;10 nm)</th><th>Ni-1</th><th>Rh</th><th>Ru</th><th>Ir</th><th>Pt</th><th>Pd</th></tr></thead>
+        <tbody>
+          <tr><td>a<sub>C,crit</sub> ≈</td><td>1.5</td><td>2.7</td><td>4.1</td><td>5.5</td><td class="match">6.4</td><td>6.7</td><td>11</td><td>25</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="note">
+      <p class="h">この表の精度について</p>
+      <p>数値は<b>スキャン図からの目視読み取り</b>（対数軸）で、<b>±30 % 程度の不確かさ</b>がある。順序と桁は信頼できるが、個々の値を設計値として使うべきではない。原著 Fig. 4 を直接参照すること。</p>
+    </div>
+
+    <p class="subhead">5.2 &nbsp;金属による違い — 活性と炭素生成</p>
+
+    <div class="tbl-scroll">
+      <table>
+        <caption>Table 2 — 改質活性 TOF, N [molecules·site⁻¹·s⁻¹]（MgO 系担体, 常圧）</caption>
+        <thead><tr><th>触媒</th><th>金属表面積<br>m²/g</th><th>H₂O/CH₄ 改質<br>550 ℃</th><th>CO₂/CH₄ 改質<br>550 ℃</th><th>CO₂/H₂ 逆シフト<br>500 ℃</th><th>H₂O / CO₂ 比</th></tr></thead>
+        <tbody>
+          <tr><td>Ni-1</td><td>1.1</td><td>2.6</td><td>1.9</td><td>5.3</td><td>1.37</td></tr>
+          <tr><td><b>Ru</b></td><td>3.0</td><td class="match">8.9</td><td class="match">2.9</td><td>8.7</td><td>3.07</td></tr>
+          <tr><td><b>Rh</b></td><td>2.2</td><td class="match">8.1</td><td>1.9</td><td>5.4</td><td>4.26</td></tr>
+          <tr><td>Pd</td><td>1.4</td><td>1.6</td><td>0.18</td><td>8.0</td><td>8.9</td></tr>
+          <tr><td>Ir</td><td>1.3</td><td>4.5</td><td>0.44</td><td>8.6</td><td>10.2</td></tr>
+          <tr><td>Pt</td><td>1.0</td><td>2.0</td><td>0.36</td><td>7.2</td><td>5.6</td></tr>
+          <tr><td>Ni-2</td><td>5.3</td><td>4.2</td><td>2.70</td><td>3.9</td><td>1.56</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p>原著が示す活性序列は <b>Ru, Rh &gt; Ir &gt; Ni, Pt, Pd</b>。CO₂ を水蒸気に置き換えると活性は下がり、その度合いは金属で違う（Ni は 1.4 倍程度だが Ir は 10 倍）。<b>Ni では CO₂ 改質と水蒸気改質の差が小さい</b>ため、CO₂ 改質では貴金属の優位が縮まる。</p>
+
+    <div class="tbl-scroll">
+      <table>
+        <caption>Table 3 — 炭素の形態（CH₄/H₂ = 95/5 vol/vol, TGA）</caption>
+        <thead><tr><th>触媒</th><th>炭素 wt%<br>500 ℃</th><th>炭素 wt%<br>650 ℃</th><th>金属結晶径<br>nm</th><th>ウィスカー</th></tr></thead>
+        <tbody>
+          <tr><td>Ni-1</td><td class="diff">3.5</td><td>2.0</td><td>5–20</td><td class="rolecol">あり（5–20 nm・Ni 内包）</td></tr>
+          <tr><td>Ru</td><td class="match">0.3</td><td>1.8</td><td>1.5–7</td><td class="rolecol">No whiskers</td></tr>
+          <tr><td>Rh</td><td>1.1</td><td>2.5</td><td>1–10 / 3–100</td><td class="rolecol">650 ℃ のみ（Fe 汚染由来）</td></tr>
+          <tr><td>Pd</td><td class="match">0</td><td class="diff">2.8</td><td>10–25</td><td class="rolecol">650 ℃ で Pd 内包</td></tr>
+          <tr><td>Ir</td><td>0.5</td><td>2.3</td><td>&lt;4</td><td class="rolecol">No whiskers</td></tr>
+          <tr><td>Pt</td><td>0.2</td><td>2.6</td><td>&lt;3–4</td><td class="rolecol">Fe 汚染由来</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p>原著の但し書きが効いている: “Whisker carbon was observed on the rhodium and platinum catalysts, but <b>in both cases contamination of the catalyst with iron most probably caused the formation of whiskers</b>.” つまり <b>真にウィスカーを作るのは Ni と Pd だけ</b>。Ru・Ir は明確に “No whiskers”。</p>
+
+    <p class="subhead">5.3 &nbsp;Alstrup の粒子径補正（参考・一次未確認）</p>
+
+    <p>Ni について、黒鉛からのずれを粒子径 d の関数で表す式が二次資料で流通している。「Alstrup が自身の知見と Rostrup-Nielsen の知見を組み合わせ、フィラメント成長を触媒する<b>最大粒子</b>の径の関数として提案した」とされる。</p>
 
     <div class="eqcard">
-      <div class="cap"><span class="name">ウィスカーカーボンの補正</span><span class="unit">kJ·mol⁻¹ · d [nm]</span></div>
+      <div class="cap"><span class="name">ウィスカーカーボンの補正（参考値）</span><span class="unit">kJ·mol⁻¹ · d [nm]</span></div>
       <div class="eqbody">
         <math display="block" xmlns="http://www.w3.org/1998/Math/MathML">
           <mi>&#916;</mi><msub><mi>G</mi><mrow><mi>c</mi><mo>,</mo><mtext>dev</mtext></mrow></msub>
@@ -393,20 +472,32 @@
 
     <div class="tbl-scroll">
       <table>
-        <caption>析出開始のしきい値 a_C,crit（黒鉛基準の a_C がこの値を超えて初めて析出）</caption>
+        <caption>この式が与える a_C,crit（Ni 想定）</caption>
         <thead><tr><th>Ni 粒子径 d</th><th>ΔG<sub>c,dev</sub></th><th>700 ℃</th><th>800 ℃</th><th>850 ℃</th><th>900 ℃</th><th>950 ℃</th></tr></thead>
         <tbody>
-          <tr><td>7 nm</td><td>15.89</td><td>7.12</td><td>5.93</td><td>5.48</td><td>5.10</td><td>4.77</td></tr>
           <tr><td>10 nm</td><td>11.90</td><td>4.35</td><td>3.80</td><td>3.58</td><td>3.39</td><td>3.22</td></tr>
           <tr><td>20 nm</td><td>7.25</td><td>2.45</td><td>2.25</td><td>2.17</td><td>2.10</td><td>2.04</td></tr>
           <tr><td>50 nm</td><td>4.46</td><td>1.74</td><td>1.65</td><td>1.61</td><td>1.58</td><td>1.55</td></tr>
           <tr><td>100 nm</td><td>3.53</td><td>1.55</td><td>1.49</td><td>1.46</td><td>1.44</td><td>1.41</td></tr>
+          <tr><td>300 nm</td><td>2.91</td><td>1.43</td><td>1.38</td><td>1.36</td><td>1.35</td><td>1.33</td></tr>
           <tr><td>∞（黒鉛極限）</td><td>2.60</td><td>1.38</td><td>1.34</td><td>1.32</td><td>1.31</td><td>1.29</td></tr>
         </tbody>
       </table>
     </div>
 
-    <p>つまり <b>a<sub>C</sub> ≤ 1 という判定は常に保守側</b>（実際より早めに「析出する」と言う）。900 ℃・d = 20 nm なら実際のしきい値は a<sub>C</sub> ≈ 2.1 で、<b>2 倍の余裕がある</b>。粒子径が小さいほどしきい値は上がる（微粒子ほど析出しにくい）。</p>
+    <div class="note">
+      <p class="h">⚠️ この式は一次確認できていない — 主根拠にしない</p>
+      <p><b>出所:</b> Web 上の二次資料（大元は <i>Appl. Catal. A</i> 2018 の whisker carbon 論文、有料）。最有力の一次候補は
+        <b>I. Alstrup, <i>J. Catal.</i> <b>109</b>(2) 241–251 (1988), DOI 10.1016/0021-9517(88)90207-2</b>
+        だが、<b>当該式がこの論文に載っているかは未確認</b>。</p>
+      <p><b>1993 Fig. 4 との整合は部分的:</b> Ni-a（300 nm）は式が 1.36〜1.43、Fig. 4 読み取りが約 1.5 で<b>よく一致</b>する。
+        しかし Ni-b（&lt;10 nm）は式が 3.4〜4.4 を与えるのに対し読み取りは約 2.7 で開きがある。
+        図の読み取り精度の問題か式の適用範囲の問題かは切り分けられていない。</p>
+      <p><b>結論:</b> 本ドキュメントの主根拠は <b>§5.1 の 1993 Fig. 4（実測・原著が手元にある）</b>。この式は Ni 向けの参考値として残す。
+        千代田の触媒は貴金属担持なので、そもそも Ni 向けの式より Fig. 4 の貴金属データのほうが直接効く。</p>
+    </div>
+
+    <p><b>まとめ: a<sub>C</sub> ≤ 1 という判定は常に保守側</b>（実際より早めに「析出する」と言う）。Ni でも 1.5〜4 倍、<b>貴金属なら 5〜7 倍</b>の余裕がある。</p>
 
     <div class="note">
       <p class="h">実測との整合 — 村長 1961</p>
@@ -464,17 +555,24 @@ problem.constrain_carbon_activity(ReactOut, 1.0, T=900, P="1.04MPaG")   # 制約
   <footer>
     <h3>出典</h3>
 
-    <p class="foot-grp">§1・§5 炭素活量の一次出典</p>
+    <p class="foot-grp">§5 金属比較・ウィスカーカーボン（主根拠）</p>
     <ul>
-      <li><span class="f">未入手</span><span class="d">J. R. Rostrup-Nielsen. “Equilibria of decomposition reactions of carbon monoxide and methane over nickel catalysts.” <i>J. Catal.</i> <b>27</b>(3), 343–356 (1972). <a class="doi" href="https://doi.org/10.1016/0021-9517(72)90170-4">10.1016/0021-9517(72)90170-4</a> 〔<b>原著</b>。Ni 上の炭素平衡が黒鉛平衡からずれることを実測。ウィスカーカーボン補正の一次出典〕</span></li>
-      <li><span class="f">未入手</span><span class="d">N. R. Udengaard, J.-H. Bak Hansen, D. C. Hanson, J. A. Stal. “Sulfur passivated reforming process lowers syngas H₂/CO ratio.” <i>Oil &amp; Gas J.</i> <b>90</b>(10), 62–67 (1992). 〔DOI なし（商業誌）。AIChE 2008 が carbon limit diagram の出典として引く参考文献 4。Topsøe の SPARG プロセス〕</span></li>
-      <li><span class="f">未入手</span><span class="d">J. R. Rostrup-Nielsen, J.-H. Bak Hansen. “CO₂-Reforming of Methane over Transition Metals.” <i>J. Catal.</i> <b>144</b>(1), 38–49 (1993). <a class="doi" href="https://doi.org/10.1006/jcat.1993.1312">10.1006/jcat.1993.1312</a> 〔AIChE 2008 の参考文献 1。貴金属は Ni より炭素生成活性が低いという触媒設計の根拠〕</span></li>
+      <li><span class="f">rostrupnielsen1993.pdf ✅取得済</span><span class="d">J. R. Rostrup-Nielsen, J.-H. Bak Hansen. “CO₂-Reforming of Methane over Transition Metals.” <i>J. Catal.</i> <b>144</b>(1), 38–49 (1993). <a class="doi" href="https://doi.org/10.1006/jcat.1993.1312">10.1006/jcat.1993.1312</a> 〔<b>§5 の主根拠</b>。Ni/Ru/Rh/Pd/Ir/Pt を比較。<b>Table 2</b> 改質活性 TOF（序列 Ru, Rh &gt; Ir &gt; Ni, Pt, Pd）、<b>Table 3</b> 炭素形態（ウィスカーは Ni と Pd のみ、Rh/Pt のものは Fe 汚染由来）、<b>Fig. 4</b> CH₄ 分解平衡定数が黒鉛より小さくその差は貴金属で最大、<b>Fig. 5</b> 炭素生成速度。AIChE 2008 の参考文献 1。全 12 頁・スキャン（テキスト層なし）〕</span></li>
+    </ul>
+
+    <p class="foot-grp">§1・§5 炭素活量の概念の原著（いずれも未入手）</p>
+    <ul>
+      <li><span class="f">未入手</span><span class="d">J. R. Rostrup-Nielsen. “Equilibria of decomposition reactions of carbon monoxide and methane over nickel catalysts.” <i>J. Catal.</i> <b>27</b>(3), 343–356 (1972). <a class="doi" href="https://doi.org/10.1016/0021-9517(72)90170-4">10.1016/0021-9517(72)90170-4</a> 〔<b>概念の原著</b>。Ni 上の炭素平衡が黒鉛平衡からずれることを最初に実測。1993 年論文の土台〕</span></li>
+      <li><span class="f">未入手</span><span class="d">J. Rostrup-Nielsen, D. L. Trimm. “Mechanisms of carbon formation on nickel-containing catalysts.” <i>J. Catal.</i> <b>48</b>(1), 155–165 (1977). <a class="doi" href="https://doi.org/10.1016/0021-9517(77)90087-2">10.1016/0021-9517(77)90087-2</a> 〔炭素生成機構の体系化。※Crossref は著者を 1 名しか返さないため共著者 Trimm は書誌検索ベース〕</span></li>
       <li><span class="f">未入手</span><span class="d">J. R. Rostrup-Nielsen. “Sulfur-passivated nickel catalysts for carbon-free steam reforming of methane.” <i>J. Catal.</i> <b>85</b>(1), 31–43 (1984). <a class="doi" href="https://doi.org/10.1016/0021-9517(84)90107-6">10.1016/0021-9517(84)90107-6</a> 〔SPARG の基礎。硫黄被覆で炭素核生成を阻害〕</span></li>
+      <li><span class="f">未入手</span><span class="d">N. R. Udengaard, J.-H. Bak Hansen, D. C. Hanson, J. A. Stal. “Sulfur passivated reforming process lowers syngas H₂/CO ratio.” <i>Oil &amp; Gas J.</i> <b>90</b>(10), 62–67 (1992). 〔DOI なし（商業誌）。AIChE 2008 が carbon limit diagram の出典として引く<b>参考文献 4</b>＝線図としての定義の一次出典〕</span></li>
+      <li><span class="f">未入手</span><span class="d">I. Alstrup. “A new model explaining carbon filament growth on nickel, iron, and Ni–Cu alloy catalysts.” <i>J. Catal.</i> <b>109</b>(2), 241–251 (1988). <a class="doi" href="https://doi.org/10.1016/0021-9517(88)90207-2">10.1016/0021-9517(88)90207-2</a> 〔<b>§5.3 の粒子径補正 ΔG<sub>c,dev</sub> = 2.6 + 93/d の一次候補。ただし当該式がこの論文にあるかは未確認</b>。式自体は二次資料（<i>Appl. Catal. A</i> 2018 の whisker carbon 論文、有料）経由〕</span></li>
     </ul>
 
     <p class="foot-grp">§4 本プロジェクトでの利用元（千代田化工建設）</p>
     <ul>
       <li><span class="f">Mikuriya_Yagi_Shimura_2008_AIChE_CO2_H2O_reforming.pdf ✅取得済</span><span class="d">T. Mikuriya, F. Yagi, M. Shimura. “Development of a new Synthesis Gas Production Catalyst and Process with CO₂ and H₂O Reforming.” <i>AIChE Annual Meeting</i>, Philadelphia, PA, Nov. 16–21 (2008), 8 pp. 〔DOI なし（会議発表）。<b>Fig.4 に “Carbon Activity = 1” の等高線</b>。定義式は書かれておらず出典は参考文献 4〕</span></li>
+      <li><span class="f">WO2012140994A1_Chiyoda_syngas.pdf ✅取得済</span><span class="d">坂口 順一（千代田化工建設）.「ＣＯ₂を排出しない合成ガスの製造方法」<b>WO2012140994A1</b>, 優先日 2011-04-12, 公開 2012-10-18, 32 pp. 〔DOI なし（特許）。<b>定義式「カーボン活性＝Ｋ×（Ｐco)²／（Ｐco2)」と「値が１を超えると触媒上にカーボンが析出しやすくなる」を明記＝千代田自身の定義が確認できる唯一の資料</b>。⚠️ 保存 PDF は全 32 頁ともスキャン画像でテキスト層なし。引用は Google Patents のテキスト層から〕</span></li>
       <li><span class="f">未入手</span><span class="d">八木 冬樹. 「CO₂ を原料として合成ガスを製造する CO₂/H₂O リフォーミングプロセス」<i>触媒</i> <b>51</b>(5), 331–335 (2009). 〔DOI なし。日本語版。非オープンアクセス〕</span></li>
       <li><span class="f">未入手</span><span class="d">八木 冬樹. 「CO₂ を原料とする合成ガス製造プロセス」<i>ペトロテック</i> <b>34</b>(6), 378–383 (2011). 〔DOI なし。日本語版。非オープンアクセス〕</span></li>
       <li><span class="f">未入手</span><span class="d">八木 冬樹. 「CO₂ リフォーミングプロセスによる合成ガス製造」<i>日本エネルギー学会誌</i> <b>91</b>(4), 274–278 (2012). 〔DOI なし。日本語版。CiNii CRID 1520290882653584768。非オープンアクセス〕</span></li>
@@ -482,8 +580,18 @@ problem.constrain_carbon_activity(ReactOut, 1.0, T=900, P="1.04MPaG")   # 制約
 
     <p class="foot-grp">§5 実測との照合（オープンアクセス）</p>
     <ul>
-      <li><span class="f">未取得（無料 PDF あり）</span><span class="d">村長 潔. 「メタン-水蒸気-炭酸ガス反応における炭素析出とモル比」<i>工業化学雑誌</i> <b>64</b>(11), 1933–1938 (1961). <a class="doi" href="https://doi.org/10.1246/nikkashi1898.64.11_1933">10.1246/nikkashi1898.64.11_1933</a> 〔595–982 ℃ で析出曲線の実験値と平衡計算値を直接比較。<b>816 ℃以上なら平衡計算で予測してよい</b>根拠〕</span></li>
-      <li><span class="f">未取得（無料 PDF あり）</span><span class="d">冨重 圭一, 藤元 薫. 「メタンの炭酸ガスリフォーミング反応による合成ガス製造における触媒特性と炭素析出挙動解析 — NiO-MgO 固溶体触媒の開発」<i>石油学会誌</i> <b>44</b>(2), 65–79 (2001). <a class="doi" href="https://doi.org/10.1627/jpi1958.44.65">10.1627/jpi1958.44.65</a> 〔常圧では耐炭素析出だが<b>高圧では対策が必要</b>と報告〕</span></li>
+      <li><span class="f">muraosa1961_carbon_deposition.pdf ✅取得済</span><span class="d">村長 潔. 「メタン-水蒸気-炭酸ガス反応における炭素析出とモル比」<i>工業化学雑誌</i> <b>64</b>(11), 1933–1938 (1961). <a class="doi" href="https://doi.org/10.1246/nikkashi1898.64.11_1933">10.1246/nikkashi1898.64.11_1933</a> 〔J-STAGE 無料。595–982 ℃ で析出曲線の実験値と平衡計算値を直接比較。<b>816 ℃以上なら平衡計算で予測してよい</b>根拠。本プロジェクトの 850–900 ℃ はこの範囲内〕</span></li>
+      <li><span class="f">tomishige2001_co2_reforming.pdf ✅取得済</span><span class="d">冨重 圭一, 藤元 薫. 「メタンの炭酸ガスリフォーミング反応による合成ガス製造における触媒特性と炭素析出挙動解析 — NiO-MgO 固溶体触媒の開発」<i>石油学会誌</i> <b>44</b>(2), 65–79 (2001). <a class="doi" href="https://doi.org/10.1627/jpi1958.44.65">10.1627/jpi1958.44.65</a> 〔J-STAGE 無料。常圧では耐炭素析出だが<b>高圧では対策が必要</b>と報告。本件は 1.04 MPaG 運転なので関連〕</span></li>
+    </ul>
+
+    <p class="foot-grp">二次資料（無料・要注意）</p>
+    <ul>
+      <li><span class="f">PNNL-16950_tar_reforming_catalyst_review.pdf ✅取得済</span><span class="d">R. A. Dagle 他. “Review of Novel Catalysts for Biomass Tar Cracking and Methane Reforming.” <b>PNNL-16950</b>, Pacific Northwest National Laboratory (2007). 〔DOI なし。<b>米国政府技術レポート＝無料で誰でも入手でき、引用も再配布も自由</b>という点に価値がある。<br>
+      <b>性質:</b> バイオマスガス化のタール改質<b>触媒</b>レビュー。目次は 1 序論 / 2 貴金属触媒によるメタン改質 / 3 代替 Ni 系触媒 / 4 代替触媒によるタール分解 / 5 結論。<br>
+      <b>どこまで書かれているか:</b> Rostrup-Nielsen &amp; Bak Hansen 1993 については<b>§2 の数段落で実験条件と結果を要約するのみ</b>（調製法、担体、TOF 比、炭素析出の有無）。要約自体は正確で、TOF 比（Ni 1.4–1.6 / Rh 4.3 / Ru 3.1 / Ir 10.2 / Pd 8.9 / Pt 5.6）は原著 Table 2 と一致する。<br>
+      <b>⚠️ 誤り:</b> 活性序列を “<span class="strike">Rh, Ru</span> &gt; Ir &gt; Ni, Pt, Pd” と書くが、<b>原著は “Ru, Rh &gt; Ir &gt; Ni, Pt, Pd”</b> で Ru と Rh が逆（原著 Table 2 の TOF は Ru 8.9 &gt; Rh 8.1）。<br>
+      <b>⚠️ 扱っていないこと:</b> 全文検索で <span class="inl">carbon activity</span> 0 件、<span class="inl">carbon limit</span> 0 件、<span class="inl">thermodynamic</span> 0 件、<span class="inl">Alstrup</span> 0 件。<b>炭素活量・熱力学的判定には一切踏み込んでいない</b>。<br>
+      <b>使いどころ:</b> 原著が入手できない場合の代替として §5.2 の実験比較を確認できる。原著が手元にある現在は、上記の序列の誤りに注意しつつ補助的に参照する位置づけ〕</span></li>
     </ul>
 
     <p class="foot-grp">実装</p>

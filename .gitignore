@@ -8,3 +8,8 @@ dist/
 *.csv
 !examples/*.csv
 examples/output/
+
+# 論文 PDF はリポジトリに置かない（本リポジトリは公開・著作権者は各出版社）。
+# references/PAPERS_INDEX.md と carbon_activity.html に書誌・DOI・入手先を
+# 全て記載してあるので、手元に PDF が無くても同じものを辿れる。
+references/*.pdf

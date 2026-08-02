@@ -6,31 +6,75 @@
 炭素活量 a_C ≤ 1 を pattern1（改質器）の運転制約として課すための根拠文献。
 
 **→ 内容のまとめは [`carbon_activity.html`](carbon_activity.html)**（定義・反応式・平衡定数・
-析出限界線図・原論文との照合・実装。`../reaction_rate/references/rate_equations.html` と同形式）
+析出限界線図・金属比較・原論文との照合・実装。`../reaction_rate/references/rate_equations.html` と同形式）
+
+> ⚠️ **論文 PDF はこのリポジトリに含まれない**（`.gitignore` で `references/*.pdf` を除外）。
+> 本リポジトリは公開で、各 PDF の著作権は出版社にあるため。**「✅取得済」は調査時に
+> 手元で確認したという意味**で、リポジトリ内にあるという意味ではない。書誌・DOI・入手先は
+> すべて記載してあるので、必要なら各自で取得すること。
 
 ---
 
-## 0. 炭素活量の一次出典 ★2026-08-02 特定
+## 0. 炭素活量 — 一次出典と主根拠 ★2026-08-02 更新
 
-- **J. R. Rostrup-Nielsen. "Equilibria of decomposition reactions of carbon monoxide
-  and methane over nickel catalysts." *J. Catal.* 27(3), 343–356 (1972).**
-- DOI: 10.1016/0021-9517(72)90170-4（解決確認済）
-- 入手: **未入手**
-- なぜ重要か: **Ni 触媒上の炭素平衡が黒鉛平衡からずれることを実測した原著。**
-  Ni 上で成長するのは黒鉛ではなく**ウィスカー（フィラメント）状炭素**で、黒鉛より
-  自由エネルギーが高い。したがって **a_C = 1（黒鉛基準）を超えてもすぐには析出しない**。
-  CO + CO2 系のほうが CH4 + H2 系よりずれが大きい。
-- 補正（Alstrup らの粒子径依存性と合わせた形。**二次資料からの引用・一次確認未了**）:
-  `ΔG_c,dev [kJ/mol] = 2.6 + 93/d(nm)`, `a_C,crit = exp(ΔG_c,dev / RT)`
-  → 900 ℃・d = 20 nm で a_C,crit ≈ 2.10。**a_C ≤ 1 は常に保守側**。
+### 0-1. ★取得済 — §5（金属比較・ウィスカーカーボン）の主根拠
 
-関連（いずれも未入手・DOI 解決確認済）:
+- **J. R. Rostrup-Nielsen, J.-H. Bak Hansen. "CO2-Reforming of Methane over Transition
+  Metals." *J. Catal.* 144(1), 38–49 (1993). DOI 10.1006/jcat.1993.1312**
+- → `rostrupnielsen1993.pdf`（全 12 頁・**スキャン、テキスト層なし**）
+- abstract: "All catalysts show **smaller equilibrium constants for methane decomposition
+  than that based on graphite, the effect being largest for the noble metals**.
+  Ru and Rh show high selectivity for carbon-free operation…"
+- **Table 2**: 改質活性 TOF。序列 **Ru, Rh > Ir > Ni, Pt, Pd**
+- **Table 3**: 炭素形態。**ウィスカーを作るのは Ni と Pd のみ**（Rh/Pt のものは Fe 汚染由来）
+- **Fig. 4**: CH4 分解平衡定数。Graphite > Ni-a(300nm) > Ni-b(<10nm) > Ni-1 > Rh > Ru > Ir > Pt > Pd
+  → 粒子径が小さいほど、また貴金属ほど析出しにくい。**a_C ≤ 1 は Ni で 1.5〜4 倍、
+  貴金属で 5〜7 倍の保守側**（値は図の目視読み取り・±30% 程度）
+- AIChE 2008 の参考文献 1
+
+### 0-2. ★取得済 — 千代田自身の定義式（唯一の一次資料）
+
+- **坂口 順一（千代田化工建設）「ＣＯ2を排出しない合成ガスの製造方法」WO2012140994A1**
+  優先日 2011-04-12 / 公開 2012-10-18 / 32 pp.
+- → `WO2012140994A1_Chiyoda_syngas.pdf`（**スキャン、テキスト層なし**）
+- 「**カーボン活性＝Ｋ×（Ｐco)²／（Ｐco2)**」「この**カーボン活性の値が１を超えると**
+  触媒上にカーボンが析出しやすくなる。」＝ **Boudouard 経路そのもの**。
+  AIChE 2008 は式を書いていないので、**千代田の定義が確認できるのはこの特許だけ**。
+- ⚠️ 引用は Google Patents のテキスト層から。保存 PDF からは直接読めない。
+
+### 0-3. 概念の原著（いずれも未入手・DOI 解決確認済）
+
+- J. R. Rostrup-Nielsen. "Equilibria of decomposition reactions of carbon monoxide
+  and methane over nickel catalysts." *J. Catal.* 27(3), 343–356 (1972).
+  DOI 10.1016/0021-9517(72)90170-4
+  〔**概念の原著**。黒鉛平衡からのずれを最初に実測。1993 年論文の土台〕
+- J. Rostrup-Nielsen, D. L. Trimm. "Mechanisms of carbon formation on nickel-containing
+  catalysts." *J. Catal.* 48(1), 155–165 (1977). DOI 10.1016/0021-9517(77)90087-2
+  〔※Crossref は著者 1 名しか返さないため共著者 Trimm は書誌検索ベース〕
 - J. R. Rostrup-Nielsen. "Sulfur-passivated nickel catalysts for carbon-free steam
   reforming of methane." *J. Catal.* 85(1), 31–43 (1984). DOI 10.1016/0021-9517(84)90107-6
   〔SPARG の基礎〕
-- J. R. Rostrup-Nielsen, J.-H. Bak Hansen. "CO2-Reforming of Methane over Transition
-  Metals." *J. Catal.* 144(1), 38–49 (1993). DOI 10.1006/jcat.1993.1312
-  〔AIChE 2008 の参考文献 1。貴金属は Ni より炭素生成活性が低い＝触媒設計の根拠〕
+- I. Alstrup. "A new model explaining carbon filament growth on nickel, iron, and Ni–Cu
+  alloy catalysts." *J. Catal.* 109(2), 241–251 (1988). DOI 10.1016/0021-9517(88)90207-2
+  〔**粒子径補正 ΔG_c,dev = 2.6 + 93/d(nm) の一次候補。当該式がこの論文にあるかは未確認**。
+  式自体は二次資料（*Appl. Catal. A* 2018 の whisker carbon 論文、有料）経由。
+  **1993 Fig. 4 が実測で同じ物理を与えるので、そちらを主根拠にした**〕
+
+### 0-4. 二次資料（無料・要注意）
+
+- **R. A. Dagle 他. "Review of Novel Catalysts for Biomass Tar Cracking and Methane
+  Reforming." PNNL-16950, Pacific Northwest National Laboratory (2007).**
+- → `PNNL-16950_tar_reforming_catalyst_review.pdf`（テキスト層あり）
+- **価値**: 米国政府技術レポート＝**無料で誰でも入手でき、引用も再配布も自由**。
+- **性質**: バイオマスガス化のタール改質**触媒**レビュー。目次は
+  1 序論 / 2 貴金属触媒によるメタン改質 / 3 代替 Ni 系触媒 / 4 代替触媒によるタール分解 / 5 結論。
+- **どこまで**: 1993 年論文は **§2 の数段落で実験条件と結果を要約するのみ**。
+  TOF 比（Ni 1.4–1.6 / Rh 4.3 / Ru 3.1 / Ir 10.2 / Pd 8.9 / Pt 5.6）は原著 Table 2 と一致。
+- **⚠️ 誤り**: 活性序列を「Rh, Ru > Ir > Ni, Pt, Pd」と書くが、**原著は「Ru, Rh > …」で
+  Ru と Rh が逆**（原著 Table 2 は Ru 8.9 > Rh 8.1）。
+- **⚠️ 扱っていない**: 全文検索で `carbon activity` 0 件 / `carbon limit` 0 件 /
+  `thermodynamic` 0 件 / `Alstrup` 0 件。**炭素活量・熱力学的判定には一切踏み込まない**。
+- **使いどころ**: 原著が入手できない人向けの代替。序列の誤りに注意して補助的に使う。
 
 ---
 
@@ -106,12 +150,15 @@ AIChE 2008 論文の参考文献 4。carbon limit diagram の出典。
 
 ---
 
-## 2. 炭素活量 a_C の定義（教科書レベル・現行実装の根拠）
+## 2. 炭素活量 a_C の定義（現行実装の根拠）
 
-§1-3 を未入手のため、実装は改質分野で標準的な定義を採用している。
-**Udengaard らの定義を確認できたら差し替えること。**
+**§0-2 の特許 WO2012140994A1 で千代田自身の定義（Boudouard 経路）が確認できた**ので、
+実装の根拠は「教科書的定義」から「一次資料で確認済み」に格上げされている。
+§1-3 の Udengaard（線図としての一次出典）は依然未入手だが、優先度は下がった。
 
 炭素析出を起こしうる 3 反応それぞれについて、固体炭素（黒鉛）の活量を求める。
+千代田は B のみで定義しているが、**平衡気相では 3 経路が一致する**ので
+改質器出口に適用する限り同値（→ `carbon_activity.html` §2）。
 
 | # | 反応 | a_C |
 |---|---|---|
