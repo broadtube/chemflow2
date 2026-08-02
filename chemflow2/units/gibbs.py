@@ -11,14 +11,12 @@ from __future__ import annotations
 
 import numpy as np
 
-from chemflow2.core.errors import ChemflowError
+from chemflow2.core.errors import CanteraError
 from chemflow2.core.pressure import parse_pressure
 from chemflow2.core.stream import Stream
 from chemflow2.core.unit import Unit
 
-
-class CanteraError(ChemflowError):
-    """Cantera の読み込み・平衡計算に失敗した。"""
+__all__ = ["CanteraError", "GibbsReactor"]   # CanteraError は core.errors から再エクスポート
 
 
 class GibbsReactor(Unit):

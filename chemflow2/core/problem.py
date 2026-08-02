@@ -17,6 +17,7 @@ from typing import Callable
 import numpy as np
 from scipy.optimize import least_squares, root
 
+from chemflow2.core.carbon_activity import carbon_activity_of
 from chemflow2.core.errors import ConstraintError, SolveError
 from chemflow2.core.expr import Expr, value_of
 from chemflow2.core.pressure import parse_pressure
@@ -208,6 +209,47 @@ class Problem:
             self.constraints.append(
                 Constraint(fn, name or f"henry[{f}] {gas.name}->{liquid.name} @{T}°C")
             )
+
+    def constrain_carbon_activity(
+        self,
+        stream: Stream,
+        value: float = 1.0,
+        *,
+        T: float | None = None,
+        P: float | str | None = None,
+        name: str | None = None,
+    ) -> None:
+        """ストリームの**炭素活量を指定値に固定する**（方程式 1 本）。
+
+        炭素析出の判定は本来 ``a_C ≤ 1`` という不等式だが、chemflow2 は自由度が
+        釣り合った等式系なので不等式は載らない。代わりに **``a_C = 1`` を課して
+        「限界そのもの」を解く**。自由変数を 1 つ開けておけば、その変数の限界値が
+        直接求まる（例: 水蒸気供給を未知にすれば、炭素析出しない最小の水蒸気量）。
+
+            # H2/CO を保ったまま、炭素析出限界まで水蒸気を絞る条件を解く
+            problem.constrain_carbon_activity(ReactOut, 1.0, T=900, P="1.04MPaG")
+
+        評価するのは**反応器出口など析出が起きる場所**の組成・温度・圧力。
+        T・P を省略すると ``stream.condition`` を使う。
+        解いた後の検算には `chemflow2.core.carbon_activity.carbon_activity_of` を
+        直接呼べばよい（制約にせず値だけ見る場合）。
+
+        残差は **log(a_C) − log(value)** を使う。a_C は組成しだいで 1e±30 まで振れ、
+        差の形だと反復の途中で overflow して解けない（分母の分圧が 0 に近づくため）。
+        零点は同じで、条件数だけが桁違いに良くなる。
+        """
+        if value <= 0:
+            raise ConstraintError(f"炭素活量の目標値は正の数にしてください: {value}")
+        log_target = np.log(value)
+        tiny = 1e-300
+
+        def fn() -> np.ndarray:
+            a = carbon_activity_of(stream, T=T, P=P)
+            return np.atleast_1d(np.log(max(a, tiny)) - log_target)
+
+        self.constraints.append(
+            Constraint(fn, name or f"carbon_activity[{stream.name}]={value}")
+        )
 
     def constrain_fracs(self, stream: Stream, fracs: dict[str, float], *, name: str | None = None) -> None:
         """ストリームのモル分率を指定する。

@@ -25,3 +25,11 @@ class ConstraintError(ChemflowError):
 
 class SolveError(ChemflowError):
     """連立方程式が収束しない・自由度が合わない。"""
+
+
+class CanteraError(ChemflowError):
+    """Cantera の読み込み・平衡計算に失敗した。
+
+    GibbsReactor（units/gibbs.py）と炭素活量（core/carbon_activity.py）の両方が
+    使うため、単体の置き場ではなくここに置く。
+    """
