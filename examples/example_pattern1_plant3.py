@@ -12,13 +12,40 @@ plant3 の新鮮供給 Steam1 は pattern1 の DryGas そのものなので、�
 Feed を逆算する形だったが、ここでは逆に **H2/CO を指定して CO2 供給量を逆算する**
 （CO2 供給が未知、比の制約が 1 本増えて自由度は 20/20 で閉じる）。
 
-背景: plant3 では **CO2 も CH4 も反応網の外にあり、パージ率の逆数（約20倍）まで
-循環系に濃縮する**。既定条件では DryGas の CO2 16.09% が反応器入口
-51.8 mol% まで濃縮し、CO を 12.7 mol% まで薄めていた。そこで DryGas 中の
-**CO2 + CH4（= 不活性計）** を減らす条件を探す。
+背景: plant3 では CO2 も CH4 もパージ率の逆数（約20倍）まで循環系に濃縮する。
+既定条件では DryGas の CO2 16.09% が反応器入口 51.8 mol% まで濃縮し、CO を
+12.7 mol% まで薄めていた。そこで DryGas 中の **CO2 + CH4（= 循環蓄積成分）** を
+減らす条件を探した。
+
+────────────────────────────────────────────────────────────────────────
+⚠️ 結論（2026-08-03 実測）: **この方針は酢酸メチル生産では裏目に出た。**
+────────────────────────────────────────────────────────────────────────
+
+  指標                    A_base    B_900C  C_03MPaG  D_01MPaG
+  DryGas 不活性計 [mol%]   18.43     10.39      3.97      2.09
+  改質 CH4 転化率 [%]      88.62     88.62     91.19     95.24
+  改質器出口 a_C            0.394     0.495     0.900     0.900
+  反応器入口 CO2 [mol%]    51.80     35.51     21.03     19.39   ← 狙いどおり下がる
+  反応器入口 CO  [mol%]    12.68     13.45     13.71     14.05   ← 狙いどおり戻る
+  反応器入口 [mol/h]       68.06     52.76     47.56     48.38
+  全触媒体積 [mL]         305.11    236.52    213.23    216.91   ← −30%
+  酢酸メチル [mol/h]       1.0416    1.0036    0.9653    0.9966   ← **減る**
+  CO パージ損失 [mol/h]    0.2675    0.1866    0.1514    0.1585
+  新鮮CO基準 炭素収率 [%]   88.03     84.81     79.51     78.94   ← **下がる**
+
+**なぜ外れたか:** 「不活性計」を代理指標にしたのが誤り。**CO2 は plant3 で完全に
+不活性ではなく、RWGS（CO2 + H2 → CO + H2O）を通じて CO を供給する役割も持つ**。
+供給 CO2 を 3.334 → 1.846 mol/h に削ると希釈は解消するが、この CO 供給源が細って
+MA 生産が落ちる。新鮮 CO は 3.550 mol/h でほぼ同じなのに MA が減るのはそのため。
+
+**得られたもの:** 触媒量 −30%（305→213 mL）、CO2 供給 −45%、CO パージ損失 −43%。
+MA を 7% 犠牲にして触媒を 30% 減らすトレードオフは経済的には成立しうる。
+
+**次の一手:** 供給 CO2 を減らすのではなく、**反応器を通った後の循環ガスから CO2 を
+除去する**方が筋が良い（RWGS の CO 供給を保ったまま希釈だけ解消できる）。
 
 実行: PYTHONPATH=.:../reaction_rate/src python3 examples/example_pattern1_plant3.py
-要 Cantera（改質器）と reaction_rate（速度論反応器）。
+要 Cantera（改質器）と reaction_rate（速度論反応器）。1 ケース約 10 分。
 """
 
 import os
@@ -48,29 +75,42 @@ T_COND = 25.0
 #: MA 合成の総括量論 3CO + 4H2 → CH3COOCH3 + H2O が要求する 1.333 に近い。
 H2_CO_TARGET = 4.911989 / 3.549828              # = 1.3837259
 
-# --- 比較する改質条件（いずれも H2/CO は上の値に固定）---
-# A は元の pattern1 の条件そのものなので、DryGas は Steam1 を再現するはず（検算になる）。
-# B は制約下での最良点。制約は 2 つ:
-#   (1) 改質温度は **900 ℃ 以下**
-#   (2) 改質器出口の **炭素活量 a_C ≤ 1**（examples/example_carbon_limit.py 参照）
+#: CH4 転化率の下限＝**現状（元の pattern1・850 ℃）の値**。これ以上を維持する。
+#: A_base（現状条件）を解くと 0.886207988601 になる。この値自体が基準なので
+#: A_base は下限ちょうどに乗る。丸め差で「制約違反」と誤判定しないよう、
+#: 判定には下の許容差を使う（1e-6 = 0.0001 %ポイント。物理的に無意味な差）。
+CH4_CONVERSION_MIN = 0.886207988601
+CH4_CONVERSION_TOL = 1e-6
+
+#: 炭素活量の設計値。千代田の特許 WO2012140994A1 表 5 では**実施例 1〜4 のすべてで
+#: 出口カーボン活性を 0.90 に設計**しているので、それに倣う（a_C ≤ 1 を余裕をもって満たす）。
+CARBON_ACTIVITY_DESIGN = 0.90
+
+# --- 比較する改質条件 ---
+# 制約は 4 つ:
+#   (1) 生成ガス H2/CO = 1.3837（現状維持）      → CO2 供給が決まる
+#   (2) CH4 転化率 ≥ 88.6208%（現状以上）
+#   (3) 改質温度 ≤ 900 ℃
+#   (4) 改質器出口の炭素活量 a_C ≤ 1
+# 目的は DryGas 中の **CO2 + CH4（plant3 で循環蓄積する成分）を最小化**すること。
+# 圧力は設計変数として動かしてよい（ただし下流 plant3 は 5 MPaG なので昇圧コストは増える）。
 #
-# 900 ℃・1.04 MPaG で H2/CO を維持したまま水蒸気供給を振ると（CH4 供給 2.1373 mol/h）:
-#   H2O[mol/h]  H2O/CH4   CO2供給   不活性(CO2+CH4)    a_C
-#      0.50      0.234    1.611      10.97 mol%     1.467  ✗ 析出域
-#      0.75      0.351    1.827       9.82 mol%     1.040  ✗ 析出域
-#      0.783     0.366    1.841       9.80 mol%     1.000  ← 炭素析出限界ちょうど
-#      0.95      0.445    1.983       9.565 mol%    0.831  OK
-#      1.00      0.468    2.020       9.561 mol%    0.789  OK  ← 採用（不活性の最小）
-#      1.05      0.491    2.057       9.575 mol%    0.751  OK
-#      2.78      1.299    3.163      14.47 mol%     0.242  OK（現状水準）
+# 転化率を上げるほど水蒸気が要り、H2/CO を戻すため CO2 も要るので不活性は増える。
+# よって最適は転化率＝下限ちょうど。ただし**低圧側では下限が自動的に満たされる**ようになり、
+# そこからは a_C が下限を決める。その場合は千代田の実務値 0.90 を採る。
 #
-# 水蒸気を絞ると CO2 供給も減るので残存 CO2 は減るが、CH4 の未転化が増える。
-# その和（不活性計）は **H2O ≈ 1.0 mol/h で極小**になり、そこでの a_C は 0.789。
-# **つまりこの温度では炭素活量の制約は効いていない**（無制約の最適点が既に炭素フリー）。
-# 制約が効き始めるのは H2O < 0.783 で、そこまで絞ると不活性はかえって増える。
+#   ケース    T      P          決め方      H2O    CO2   不活性  CH4転化率   a_C
+#   A_base   850  1.04MPaG   転化率       2.777  3.334  18.43%  88.62%   0.394  ← 現状
+#   B_900C   900  1.04MPaG   転化率       1.545  2.398  10.39%  88.62%   0.495  ← 圧力据え置き
+#   C_03MPaG 900  0.3MPaG    a_C=0.90     0.562  1.867   3.97%  91.19%   0.900
+#   D_01MPaG 900  0.1MPaG    a_C=0.90     0.449  1.846   2.09%  95.24%   0.900  ← 不活性最小
+#
+# A は元の pattern1 の条件そのものなので DryGas は Steam1 を再現する（検算になる）。
 CASES = {
-    "A_base":     {"T": 850.0, "P": "1.04MPaG", "h2o": 2.776607},
-    "B_900C_min": {"T": 900.0, "P": "1.04MPaG", "h2o": 1.0},
+    "A_base":   {"T": 850.0, "P": "1.04MPaG", "h2o": 2.776607},
+    "B_900C":   {"T": 900.0, "P": "1.04MPaG", "ch4_conversion": CH4_CONVERSION_MIN},
+    "C_03MPaG": {"T": 900.0, "P": "0.3MPaG",  "carbon_limit": CARBON_ACTIVITY_DESIGN},
+    "D_01MPaG": {"T": 900.0, "P": "0.1MPaG",  "carbon_limit": CARBON_ACTIVITY_DESIGN},
 }
 
 #: 出口ストリームの初期推定。Gibbs + 炭素活量の制約を同時に解くとき、既定の
@@ -173,18 +213,25 @@ def main():
     only = sys.argv[1] if len(sys.argv) > 1 else None
 
     # --- 改質側だけ先に比較（Gibbs のみなので一瞬）---
-    print(f"=== 前工程 pattern1: H2/CO={H2_CO_TARGET} 制約下での改質条件比較 ===")
-    print(f"{'case':>10s} {'T[℃]':>6s} {'H2O':>7s} {'CO2feed':>8s} {'DryGas':>8s} "
-          f"{'H2/CO':>6s} {'CO2%':>7s} {'CH4%':>7s} {'不活性計':>8s} {'CO%':>7s} {'CO':>7s}")
+    print(f"=== 前工程 pattern1: H2/CO={H2_CO_TARGET:.4f} 維持 + CH4 転化率 ≥ "
+          f"{CH4_CONVERSION_MIN*100:.4f}% + a_C ≤ 1 の下での改質条件比較 ===")
+    print(f"{'case':>10s} {'T[℃]':>6s} {'P':>9s} {'H2O':>7s} {'CO2feed':>8s} {'DryGas':>8s} "
+          f"{'H2/CO':>7s} {'CO2%':>7s} {'CH4%':>7s} {'不活性計':>8s} {'CO':>7s} "
+          f"{'CH4転化':>8s} {'a_C':>7s}")
     feeds, summaries = {}, {}
     for tag, cond in CASES.items():
-        _, DryGas, CO2f, _ = solve_reformer(T=cond["T"], P=cond["P"], h2o=cond["h2o"],
-                                            verbose=False)
+        problem, DryGas, CO2f, H2Of = solve_reformer(verbose=False, **cond)
+        react_out = next(s for s in problem.streams if s.name == "5. ReactOut")
         s = drygas_summary(DryGas)
-        feeds[tag], summaries[tag] = as_plant_feed(DryGas), s
-        print(f"{tag:>10s} {cond['T']:6.0f} {cond['h2o']:7.4f} {CO2f.flow_of('CO2'):8.4f} "
-              f"{s['total']:8.4f} {s['H2/CO']:6.4f} {s['CO2%']:7.2f} {s['CH4%']:7.2f} "
-              f"{s['CO2%']+s['CH4%']:8.2f} {s['CO%']:7.2f} {s['CO']:7.4f}")
+        conv = (RG_FEED["CH4"] - react_out.flow_of("CH4")) / RG_FEED["CH4"]
+        a_c = carbon_activity_of(react_out, T=cond["T"], P=cond["P"])
+        feeds[tag], summaries[tag] = as_plant_feed(DryGas), dict(s, conv=conv, aC=a_c)
+        flag = ("" if (conv >= CH4_CONVERSION_MIN - CH4_CONVERSION_TOL and a_c <= 1.0)
+                else "  ⚠制約違反")
+        print(f"{tag:>10s} {cond['T']:6.0f} {cond['P']:>9s} {H2Of.flow_of('H2O'):7.4f} "
+              f"{CO2f.flow_of('CO2'):8.4f} {s['total']:8.4f} {s['H2/CO']:7.4f} "
+              f"{s['CO2%']:7.2f} {s['CH4%']:7.2f} {s['CO2%']+s['CH4%']:8.2f} {s['CO']:7.4f} "
+              f"{conv*100:7.3f}% {a_c:7.4f}{flag}")
 
     # A_base は元の pattern1 条件そのものなので、DryGas は Steam1 と一致するはず
     worst = max(abs(feeds["A_base"][f] - v) for f, v in STEAM1_REFERENCE.items())
@@ -241,6 +288,10 @@ def main():
         print(f"{'指標':>26s}" + "".join(f"{t:>14s}" for t in results))
         rows = [("DryGas 中 CO2 [mol%]", lambda t: summaries[t]["CO2%"]),
                 ("DryGas 中 CH4 [mol%]", lambda t: summaries[t]["CH4%"]),
+                ("DryGas 不活性計 [mol%]",
+                 lambda t: summaries[t]["CO2%"] + summaries[t]["CH4%"]),
+                ("改質 CH4 転化率 [%]", lambda t: summaries[t]["conv"] * 100),
+                ("改質器出口 a_C", lambda t: summaries[t]["aC"]),
                 ("反応器入口 CO2 [mol%]", lambda t: results[t]["CO2_in%"]),
                 ("反応器入口 CH4 [mol%]", lambda t: results[t]["CH4_in%"]),
                 ("反応器入口 CO [mol%]", lambda t: results[t]["CO_in%"]),
