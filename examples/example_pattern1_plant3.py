@@ -83,7 +83,7 @@ STEAM1_REFERENCE = {"H2": 4.911989, "CO": 3.549828, "CO2": 1.675074,
 
 
 def solve_reformer(*, T, P, h2o=None, h2_co=H2_CO_TARGET, carbon_limit=None,
-                   verbose=True):
+                   ch4_conversion=None, verbose=True):
     """H2/CO を指定して CO2 供給量を逆算する形で pattern1 を解き、DryGas を返す。
 
     h2o を数値で渡すと水蒸気供給を固定する。自由度 20/20:
@@ -95,8 +95,10 @@ def solve_reformer(*, T, P, h2o=None, h2_co=H2_CO_TARGET, carbon_limit=None,
     a_C ≤ 1 は不等式なので等式系には載らないが、限界そのものを解けば
     「炭素析出しない最小の水蒸気量」が求まる。
     """
-    if (h2o is None) == (carbon_limit is None):
-        raise ValueError("h2o か carbon_limit のどちらか一方を指定してください")
+    # 水蒸気供給を決める式は 1 本だけ: 固定 / 炭素析出限界 / CH4 転化率 のいずれか
+    specs = [h2o is not None, carbon_limit is not None, ch4_conversion is not None]
+    if sum(specs) != 1:
+        raise ValueError("h2o / carbon_limit / ch4_conversion のいずれか 1 つを指定してください")
     hot = StreamCondition(T=T, P=P, phase="gas")
     cold_g = StreamCondition(T=T_COND, P=P, phase="gas")
     cold_l = StreamCondition(T=T_COND, P=P, phase="liquid")
@@ -125,14 +127,22 @@ def solve_reformer(*, T, P, h2o=None, h2_co=H2_CO_TARGET, carbon_limit=None,
     # 生成ガスの H2/CO を指定（残り 1 本）
     problem.constrain(DryGas.flow_expr("H2"), h2_co * DryGas.flow_expr("CO"),
                       name=f"H2/CO={h2_co}")
-    # 炭素析出限界を解く場合はさらに 1 本（水蒸気供給が未知になったぶん）
+    # 水蒸気供給が未知のとき、それを決める式を 1 本足す
     if carbon_limit is not None:
         problem.constrain_carbon_activity(ReactOut, carbon_limit, T=T, P=P)
+    elif ch4_conversion is not None:
+        # CH4 転化率 X ⇔ 出口 CH4 = (1 − X) × 供給 CH4（供給は RG_feed で固定）
+        problem.constrain(ReactOut.flow_expr("CH4"),
+                          (1.0 - ch4_conversion) * RG_FEED["CH4"],
+                          name=f"CH4 conversion={ch4_conversion}")
 
     # 初期推定を入れておくと Gibbs が素直に収束する
     CO2f.molar_flows[:] = 3.0
     if h2o is None:
-        H2Of.molar_flows[:] = 2.0
+        # CH4 転化率を高く要求するほど水蒸気も CO2 も桁が上がるので初期推定を合わせる
+        scale = 1.0 if ch4_conversion is None else max(1.0, 30.0 * ch4_conversion ** 12)
+        H2Of.molar_flows[:] = 2.0 * scale
+        CO2f.molar_flows[:] = 3.0 * scale
     sol = problem.solve()
     if not sol.success:
         raise RuntimeError(f"改質器が収束せず: {sol}")
