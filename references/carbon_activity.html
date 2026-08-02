@@ -1,0 +1,498 @@
+<title>炭素活量リファレンス — 改質の炭素析出限界</title>
+<style>
+  :root{
+    --ink:#1b242c; --muted:#5b6873; --faint:#8a95a0;
+    --paper:#f5f6f3; --panel:#ffffff; --panel-2:#eef1ee; --line:#dbe0dd;
+    --accent:#0d6d72; --accent-soft:#e2efef; --accent-ink:#0a5155;
+    --amber:#a15c11; --amber-soft:#f6ecdc; --amber-line:#e4c79a;
+    --code-bg:#f0f2ef; --shadow:0 1px 2px rgba(20,30,40,.05),0 8px 24px rgba(20,30,40,.05);
+    --serif:"Iowan Old Style","Palatino Linotype",Palatino,"Book Antiqua",Georgia,serif;
+    --sans:ui-sans-serif,"Segoe UI",system-ui,"Helvetica Neue",Arial,sans-serif;
+    --mono:ui-monospace,"SFMono-Regular","Cascadia Code","Roboto Mono",Consolas,monospace;
+  }
+  @media (prefers-color-scheme:dark){
+    :root{
+      --ink:#e7edf0; --muted:#9aa7b1; --faint:#71808b;
+      --paper:#0f151a; --panel:#161e25; --panel-2:#1c262e; --line:#2a353e;
+      --accent:#45b6bb; --accent-soft:#12312f; --accent-ink:#7fd4d7;
+      --amber:#d69848; --amber-soft:#2b2113; --amber-line:#5a441f;
+      --code-bg:#1a232b; --shadow:0 1px 2px rgba(0,0,0,.3),0 10px 30px rgba(0,0,0,.35);
+    }
+  }
+  :root[data-theme="light"]{
+    --ink:#1b242c; --muted:#5b6873; --faint:#8a95a0; --paper:#f5f6f3; --panel:#ffffff;
+    --panel-2:#eef1ee; --line:#dbe0dd; --accent:#0d6d72; --accent-soft:#e2efef; --accent-ink:#0a5155;
+    --amber:#a15c11; --amber-soft:#f6ecdc; --amber-line:#e4c79a; --code-bg:#f0f2ef;
+    --shadow:0 1px 2px rgba(20,30,40,.05),0 8px 24px rgba(20,30,40,.05);
+  }
+  :root[data-theme="dark"]{
+    --ink:#e7edf0; --muted:#9aa7b1; --faint:#71808b; --paper:#0f151a; --panel:#161e25;
+    --panel-2:#1c262e; --line:#2a353e; --accent:#45b6bb; --accent-soft:#12312f; --accent-ink:#7fd4d7;
+    --amber:#d69848; --amber-soft:#2b2113; --amber-line:#5a441f; --code-bg:#1a232b;
+    --shadow:0 1px 2px rgba(0,0,0,.3),0 10px 30px rgba(0,0,0,.35);
+  }
+
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--sans);
+    line-height:1.6;-webkit-font-smoothing:antialiased;font-size:16px;}
+  .wrap{max-width:920px;margin:0 auto;padding:0 24px 96px;}
+
+  nav.bar{position:sticky;top:0;z-index:20;background:color-mix(in srgb,var(--paper) 88%,transparent);
+    backdrop-filter:blur(10px);border-bottom:1px solid var(--line);}
+  .bar-in{max-width:920px;margin:0 auto;padding:11px 24px;display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;}
+  .bar-in .brand{font-family:var(--mono);font-size:12px;letter-spacing:.04em;color:var(--muted);
+    text-transform:uppercase;margin-right:auto;}
+  .bar-in a{font-size:13.5px;color:var(--ink);text-decoration:none;padding:3px 10px;border-radius:999px;
+    border:1px solid transparent;transition:background .15s,border-color .15s;}
+  .bar-in a:hover{background:var(--accent-soft);border-color:var(--line);}
+  .bar-in a:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
+
+  header.hero{padding:60px 0 34px;border-bottom:1px solid var(--line);margin-bottom:8px;}
+  .eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.13em;text-transform:uppercase;
+    color:var(--accent-ink);margin:0 0 16px;}
+  h1{font-family:var(--serif);font-weight:600;font-size:clamp(30px,5vw,44px);line-height:1.1;
+    letter-spacing:-.01em;margin:0 0 14px;text-wrap:balance;}
+  .lede{font-size:17px;color:var(--muted);max-width:64ch;margin:0;}
+  .lede b{color:var(--ink);font-weight:600;}
+
+  .legend{margin:26px 0 0;display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));
+    gap:10px 20px;padding:18px 20px;background:var(--panel-2);border:1px solid var(--line);border-radius:12px;}
+  .legend dl{margin:0;display:flex;gap:10px;align-items:baseline;font-size:13.5px;}
+  .legend dt{font-family:var(--mono);color:var(--accent-ink);white-space:nowrap;}
+  .legend dd{margin:0;color:var(--muted);}
+
+  section{padding-top:52px;scroll-margin-top:64px;}
+  .sec-head{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;margin-bottom:4px;}
+  .sec-head h2{font-family:var(--serif);font-weight:600;font-size:27px;margin:0;letter-spacing:-.01em;}
+  .tag{font-family:var(--mono);font-size:11.5px;text-transform:uppercase;letter-spacing:.08em;
+    color:var(--accent-ink);background:var(--accent-soft);border:1px solid var(--line);
+    padding:2px 9px;border-radius:999px;}
+  .cite{font-size:13.5px;color:var(--muted);margin:6px 0 22px;}
+  .cite code{font-family:var(--mono);font-size:12.5px;background:var(--code-bg);padding:1px 6px;border-radius:5px;}
+  .subhead{font-family:var(--serif);font-weight:600;font-size:21px;margin:42px 0 4px;letter-spacing:-.01em;
+    padding-top:22px;border-top:1px solid var(--line);text-wrap:balance;}
+
+  .rxns{display:flex;flex-direction:column;gap:8px;margin:0 0 22px;padding:0;list-style:none;}
+  .rxns li{display:flex;gap:12px;align-items:center;font-size:15px;padding:8px 14px;background:var(--panel);
+    border:1px solid var(--line);border-radius:9px;box-shadow:var(--shadow);}
+  .rxns .n{font-family:var(--mono);font-size:12px;color:var(--accent-ink);border:1px solid var(--line);
+    background:var(--accent-soft);border-radius:6px;padding:1px 7px;white-space:nowrap;}
+  .rxns .eq{font-family:var(--serif);font-size:16.5px;}
+  .rxns .lbl{margin-left:auto;font-size:12.5px;color:var(--muted);font-family:var(--mono);
+    text-transform:uppercase;letter-spacing:.05em;}
+
+  .eqcard{background:var(--panel);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);
+    margin:14px 0;overflow:hidden;}
+  .eqcard .cap{display:flex;align-items:baseline;gap:12px;padding:10px 18px;background:var(--panel-2);
+    border-bottom:1px solid var(--line);}
+  .eqcard .cap .name{font-family:var(--mono);font-size:12.5px;color:var(--accent-ink);}
+  .eqcard .cap .unit{margin-left:auto;font-family:var(--mono);font-size:11.5px;color:var(--muted);}
+  .eqcard .eqbody{padding:16px 18px;overflow-x:auto;}
+  math{font-size:17px;}
+
+  .note{border-left:3px solid var(--amber);background:var(--amber-soft);border-radius:0 10px 10px 0;
+    padding:14px 18px;margin:16px 0;font-size:14.5px;}
+  .note.acc{border-left-color:var(--accent);background:var(--accent-soft);}
+  .note .h{font-family:var(--mono);font-size:11.5px;text-transform:uppercase;letter-spacing:.09em;
+    color:var(--amber);margin:0 0 6px;font-weight:600;}
+  .note.acc .h{color:var(--accent-ink);}
+  .note p{margin:6px 0 0;} .note p:first-of-type{margin-top:0;}
+  .note code,.inl{font-family:var(--mono);font-size:12.5px;background:var(--code-bg);padding:1px 6px;border-radius:5px;}
+
+  .tbl-scroll{overflow-x:auto;margin:14px 0;border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);}
+  table{border-collapse:collapse;width:100%;font-size:14px;background:var(--panel);min-width:min(100%,520px);}
+  caption{caption-side:top;text-align:left;font-family:var(--mono);font-size:11.5px;text-transform:uppercase;
+    letter-spacing:.07em;color:var(--muted);padding:12px 16px 8px;}
+  th,td{padding:9px 14px;text-align:right;border-bottom:1px solid var(--line);
+    font-variant-numeric:tabular-nums;font-family:var(--mono);font-size:13px;white-space:nowrap;}
+  th:first-child,td:first-child{text-align:left;font-family:var(--sans);}
+  thead th{color:var(--muted);font-weight:600;border-bottom:1.5px solid var(--line);
+    background:var(--panel-2);font-size:11.5px;text-transform:uppercase;letter-spacing:.04em;}
+  tbody tr:last-child td{border-bottom:none;}
+  tbody tr:hover td{background:var(--panel-2);}
+  td.match{color:#1c62c9;} td.diff{color:var(--amber);}
+  @media (prefers-color-scheme:dark){ td.match{color:#6fb2ff;} }
+  :root[data-theme="light"] td.match{color:#1c62c9;}
+  :root[data-theme="dark"] td.match{color:#6fb2ff;}
+  .rolecol{color:var(--muted);font-family:var(--sans)!important;font-size:12.5px;text-align:left!important;}
+
+  figure{margin:18px 0;background:var(--panel);border:1px solid var(--line);border-radius:12px;
+    box-shadow:var(--shadow);padding:14px;}
+  figure img{width:100%;height:auto;display:block;border-radius:8px;}
+  figcaption{font-size:13px;color:var(--muted);margin-top:10px;}
+
+  footer{margin-top:64px;padding-top:26px;border-top:1px solid var(--line);color:var(--muted);font-size:13.5px;}
+  footer h3{font-family:var(--mono);font-size:12px;text-transform:uppercase;letter-spacing:.09em;color:var(--ink);margin:0 0 12px;}
+  footer ul{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:7px;}
+  footer li{display:flex;gap:10px;flex-wrap:wrap;}
+  footer .f{font-family:var(--mono);font-size:12px;color:var(--accent-ink);}
+  footer .d{color:var(--faint);}
+  footer .foot-grp{font-family:var(--mono);font-size:11px;text-transform:uppercase;letter-spacing:.06em;
+    color:var(--muted);margin:18px 0 6px;}
+  footer .foot-grp:first-of-type{margin-top:2px;}
+  a.doi{color:var(--accent-ink);text-decoration:none;border-bottom:1px solid var(--line);}
+  a.doi:hover{border-bottom-color:var(--accent);}
+  @media (max-width:560px){ .wrap{padding:0 16px 72px;} .bar-in{padding:10px 16px;} .rxns .lbl{display:none;} }
+</style>
+
+<nav class="bar">
+  <div class="bar-in">
+    <span class="brand">carbon&nbsp;activity · reforming</span>
+    <a href="#def">定義</a>
+    <a href="#unique">一致性</a>
+    <a href="#K">平衡定数</a>
+    <a href="#diagram">析出限界線図</a>
+    <a href="#whisker">黒鉛基準の限界</a>
+    <a href="#impl">実装</a>
+  </div>
+</nav>
+
+<div class="wrap">
+  <header class="hero">
+    <p class="eyebrow">Carbon activity · CH₄ + CO₂ + H₂O reforming</p>
+    <h1>炭素活量 a<sub>C</sub> — 改質器の炭素析出限界</h1>
+    <p class="lede">CH₄ を CO₂ と H₂O で改質して合成ガスを作るとき、水蒸気を絞るほど省エネかつ CO₂ を有効利用できるが、<b>触媒上に炭素が析出する</b>。その境界を熱力学で切る量が炭素活量 a<sub>C</sub> で、<b>a<sub>C</sub> &gt; 1 なら気相が固体炭素に対して過飽和</b>＝析出が有利になる。ここでは定義・計算法・chemflow2 での実装・原論文との照合をまとめる。</p>
+
+    <div class="legend" aria-label="記号の凡例">
+      <dl><dt>a<sub>C</sub></dt><dd>炭素活量（基準 = 純黒鉛, a = 1）</dd></dl>
+      <dl><dt>p<sub>i</sub></dt><dd>分圧 [atm]（p° = 1 atm 基準の無次元比）</dd></dl>
+      <dl><dt>K<sub>B</sub>, K<sub>M</sub>, K<sub>R</sub></dt><dd>各炭素生成反応の平衡定数（無次元）</dd></dl>
+      <dl><dt>O/C, H/C</dt><dd>供給の原子比（線図の軸）</dd></dl>
+      <dl><dt>ΔG°</dt><dd>標準生成ギブズエネルギー</dd></dl>
+      <dl><dt>d</dt><dd>Ni 粒子径 [nm]（ウィスカー補正）</dd></dl>
+    </div>
+  </header>
+
+  <!-- ============ 定義 ============ -->
+  <section id="def">
+    <div class="sec-head">
+      <h2>1 &nbsp;定義 — 固体炭素の活量</h2>
+      <span class="tag">3 routes</span>
+    </div>
+    <p class="cite">一次出典: Rostrup-Nielsen, <i>J. Catal.</i> <b>27</b> 343–356 (1972) · DOI 10.1016/0021-9517(72)90170-4 ·
+      線図としての利用: Udengaard ら, <i>Oil &amp; Gas J.</i> <b>90</b>(10) 62–67 (1992) ·
+      本プロジェクトでの利用元: Mikuriya, Yagi, Shimura, <i>AIChE Annual Meeting</i> 2008 · <code>Mikuriya_Yagi_Shimura_2008_AIChE_CO2_H2O_reforming.pdf</code></p>
+
+    <p>a<sub>C</sub> は「その気相と平衡にある固体炭素（黒鉛）の活量」。固体炭素を生む反応それぞれについて、<b>固体炭素の活量を未知数として平衡式を解く</b>と得られる。</p>
+
+    <ul class="rxns">
+      <li><span class="n">B</span><span class="eq">2 CO ⇌ C(gr) + CO₂</span><span class="lbl">Boudouard</span></li>
+      <li><span class="n">M</span><span class="eq">CH₄ ⇌ C(gr) + 2 H₂</span><span class="lbl">CH₄ cracking</span></li>
+      <li><span class="n">R</span><span class="eq">CO + H₂ ⇌ C(gr) + H₂O</span><span class="lbl">CO reduction</span></li>
+    </ul>
+
+    <div class="eqcard">
+      <div class="cap"><span class="name">a_C &nbsp;(B: Boudouard)</span><span class="unit">無次元</span></div>
+      <div class="eqbody">
+        <math display="block" xmlns="http://www.w3.org/1998/Math/MathML">
+          <msub><mi>K</mi><mi>B</mi></msub><mo>=</mo>
+          <mfrac><mrow><msub><mi>a</mi><mi>C</mi></msub><msub><mi>p</mi><mrow><mtext>CO</mtext><mn>2</mn></mrow></msub></mrow>
+                 <msubsup><mi>p</mi><mtext>CO</mtext><mn>2</mn></msubsup></mfrac>
+          <mo>&#8658;</mo>
+          <msub><mi>a</mi><mi>C</mi></msub><mo>=</mo>
+          <msub><mi>K</mi><mi>B</mi></msub>
+          <mfrac><msubsup><mi>p</mi><mtext>CO</mtext><mn>2</mn></msubsup><msub><mi>p</mi><mrow><mtext>CO</mtext><mn>2</mn></mrow></msub></mfrac>
+        </math>
+      </div>
+    </div>
+
+    <div class="eqcard">
+      <div class="cap"><span class="name">a_C &nbsp;(M: メタン分解)</span><span class="unit">無次元</span></div>
+      <div class="eqbody">
+        <math display="block" xmlns="http://www.w3.org/1998/Math/MathML">
+          <msub><mi>K</mi><mi>M</mi></msub><mo>=</mo>
+          <mfrac><mrow><msub><mi>a</mi><mi>C</mi></msub><msubsup><mi>p</mi><mrow><mtext>H</mtext><mn>2</mn></mrow><mn>2</mn></msubsup></mrow>
+                 <msub><mi>p</mi><mrow><mtext>CH</mtext><mn>4</mn></mrow></msub></mfrac>
+          <mo>&#8658;</mo>
+          <msub><mi>a</mi><mi>C</mi></msub><mo>=</mo>
+          <msub><mi>K</mi><mi>M</mi></msub>
+          <mfrac><msub><mi>p</mi><mrow><mtext>CH</mtext><mn>4</mn></mrow></msub><msubsup><mi>p</mi><mrow><mtext>H</mtext><mn>2</mn></mrow><mn>2</mn></msubsup></mfrac>
+        </math>
+      </div>
+    </div>
+
+    <div class="eqcard">
+      <div class="cap"><span class="name">a_C &nbsp;(R: CO 還元)</span><span class="unit">無次元</span></div>
+      <div class="eqbody">
+        <math display="block" xmlns="http://www.w3.org/1998/Math/MathML">
+          <msub><mi>K</mi><mi>R</mi></msub><mo>=</mo>
+          <mfrac><mrow><msub><mi>a</mi><mi>C</mi></msub><msub><mi>p</mi><mrow><mtext>H</mtext><mn>2</mn><mtext>O</mtext></mrow></msub></mrow>
+                 <mrow><msub><mi>p</mi><mtext>CO</mtext></msub><msub><mi>p</mi><mrow><mtext>H</mtext><mn>2</mn></mrow></msub></mrow></mfrac>
+          <mo>&#8658;</mo>
+          <msub><mi>a</mi><mi>C</mi></msub><mo>=</mo>
+          <msub><mi>K</mi><mi>R</mi></msub>
+          <mfrac><mrow><msub><mi>p</mi><mtext>CO</mtext></msub><msub><mi>p</mi><mrow><mtext>H</mtext><mn>2</mn></mrow></msub></mrow>
+                 <msub><mi>p</mi><mrow><mtext>H</mtext><mn>2</mn><mtext>O</mtext></mrow></msub></mfrac>
+        </math>
+      </div>
+    </div>
+
+    <div class="note acc">
+      <p class="h">単位の落とし穴 — 分圧は atm</p>
+      <p>K は無次元なので、式中の p は本当は <b>p/p°</b>（p° = 1 atm）という無次元比。実装では Cantera の <code>reference_pressure</code> が 101325 Pa なのでそれに合わせ、<b>分圧を atm で入れる</b>。ここを Pa や bar にすると a<sub>C</sub> が桁で狂う。</p>
+    </div>
+  </section>
+
+  <!-- ============ 一致性 ============ -->
+  <section id="unique">
+    <div class="sec-head">
+      <h2>2 &nbsp;3 つの式はいつ一致するか</h2>
+      <span class="tag">equilibrated gas</span>
+    </div>
+    <p class="cite">3 式の差を取ると、すべて<b>改質系の反応そのもの</b>になる。独立なのは 2 つ。</p>
+
+    <ul class="rxns">
+      <li><span class="n">B − R</span><span class="eq">CO + H₂O ⇌ CO₂ + H₂</span><span class="lbl">water gas shift</span></li>
+      <li><span class="n">M − R</span><span class="eq">CH₄ + H₂O ⇌ CO + 3 H₂</span><span class="lbl">steam reforming</span></li>
+      <li><span class="n">B − M</span><span class="eq">CH₄ + CO₂ ⇌ 2 CO + 2 H₂</span><span class="lbl">dry reforming</span></li>
+    </ul>
+
+    <p>したがって <b>気相がこれらの反応について平衡していれば Q = K となり、3 つの a<sub>C</sub> は厳密に一致する</b>。改質器出口（ギブズ平衡）はこれに当たり、値は一意。析出限界線図が単一の曲線で描けるのはこのため。</p>
+
+    <div class="tbl-scroll">
+      <table>
+        <caption>pattern1 の改質条件（1.04 MPaG）での実測 — 出口は 3 経路が一致、入口はばらつく</caption>
+        <thead><tr><th>気相</th><th>Boudouard</th><th>CH₄ 分解</th><th>CO 還元</th><th>相対ばらつき</th></tr></thead>
+        <tbody>
+          <tr><td>改質器<b>出口</b> 850 ℃（Gibbs 平衡）</td><td class="match">0.394400</td><td class="match">0.394400</td><td class="match">0.394400</td><td>1.65e−11</td></tr>
+          <tr><td>改質器<b>出口</b> 900 ℃（Gibbs 平衡）</td><td class="match">0.234475</td><td class="match">0.234475</td><td class="match">0.234475</td><td>4.87e−12</td></tr>
+          <tr><td>改質器<b>入口</b> 850 ℃（非平衡）</td><td class="diff">0</td><td class="diff">75.3</td><td class="diff">0</td><td>—</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p>入口で 2 経路が 0 なのは原料に CO が無いため。<b>非平衡の気相に当てる場合は 3 つの最大値を取る</b>（どれか 1 つでも 1 を超えれば析出しうる、という保守側の扱い）。</p>
+
+    <div class="note">
+      <p class="h">この判定が保証しない範囲</p>
+      <p>炭素析出限界線図は <b>“equilibrated gas”</b>（平衡気相）を前提にした<b>反応器全体としての工学的判定</b>。実際の改質管では入口付近で気相がまだ平衡しておらず、そこでは局所的に a<sub>C</sub> が高くなりうる（上表の入口 75.3 がまさにそれ）。<b>千代田化工の耐炭素析出触媒が効くのはこの速度論的な領域</b>で、同社は a<sub>C</sub> &gt; 1 の側で運転することを売りにしている（§5）。</p>
+    </div>
+  </section>
+
+  <!-- ============ 平衡定数 ============ -->
+  <section id="K">
+    <div class="sec-head">
+      <h2>3 &nbsp;平衡定数の計算</h2>
+      <span class="tag">Cantera</span>
+    </div>
+    <p class="cite">気相 <code>gri30.yaml</code>・固体炭素 <code>graphite.yaml</code>（相 <code>C(gr)</code>）の標準生成ギブズエネルギーから。</p>
+
+    <div class="eqcard">
+      <div class="cap"><span class="name">平衡定数</span><span class="unit">無次元 · p° = 1 atm</span></div>
+      <div class="eqbody">
+        <math display="block" xmlns="http://www.w3.org/1998/Math/MathML">
+          <mi>K</mi><mo>=</mo><mi>exp</mi>
+          <mrow><mo>(</mo><mo>&#8722;</mo>
+            <mfrac><mrow><mi>&#916;</mi><msup><mi>G</mi><mo>&#176;</mo></msup></mrow><mrow><mi>R</mi><mi>T</mi></mrow></mfrac>
+          <mo>)</mo></mrow>
+          <mo>,</mo><mspace width="1em"/>
+          <mi>&#916;</mi><msup><mi>G</mi><mo>&#176;</mo></msup><mo>=</mo>
+          <munder><mo>&#8721;</mo><mi>i</mi></munder><msub><mi>&#957;</mi><mi>i</mi></msub><msubsup><mi>g</mi><mi>i</mi><mo>&#176;</mo></msubsup>
+          <mspace width="1em"/><mo>(</mo><mtext>C(gr) を含む</mtext><mo>)</mo>
+        </math>
+      </div>
+    </div>
+
+    <div class="tbl-scroll">
+      <table>
+        <caption>検算 — Cantera で計算した平衡定数</caption>
+        <thead><tr><th>T</th><th>K<sub>B</sub> (Boudouard)</th><th>K<sub>M</sub> (CH₄ 分解)</th><th>K<sub>R</sub> (CO 還元)</th></tr></thead>
+        <tbody>
+          <tr><td>500 ℃ (773.15 K)</td><td>2.4296e+02</td><td>4.7347e−01</td><td>4.7471e+01</td></tr>
+          <tr><td>700 ℃ (973.15 K)</td><td class="match">9.9978e−01</td><td>7.7947e+00</td><td>6.2037e−01</td></tr>
+          <tr><td>850 ℃ (1123.15 K)</td><td>6.0235e−02</td><td>3.4111e+01</td><td>6.5862e−02</td></tr>
+          <tr><td>900 ℃ (1173.15 K)</td><td>2.7833e−02</td><td>5.1449e+01</td><td>3.5432e−02</td></tr>
+          <tr><td>1000 ℃ (1273.15 K)</td><td>7.1738e−03</td><td>1.0646e+02</td><td>1.1877e−02</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p>妥当性の確認: Boudouard は<b>発熱</b>なので高温で K が下がり、メタン分解は<b>吸熱</b>なので高温で K が上がる。そして <b>K<sub>B</sub> ≈ 1.000 がちょうど 973.15 K（700 ℃）</b>で得られ、Boudouard 平衡の古典的な基準温度と一致する。</p>
+  </section>
+
+  <!-- ============ 線図 ============ -->
+  <section id="diagram">
+    <div class="sec-head">
+      <h2>4 &nbsp;炭素析出限界線図と原論文との照合</h2>
+      <span class="tag">O/C × H/C</span>
+    </div>
+    <p class="cite">Mikuriya, Yagi, Shimura, <i>AIChE Annual Meeting</i> 2008, Fig.4 “Feed Gas Conditions for Process Studies” ·
+      同図は等高線 <b>“Carbon Activity = 1”</b> を示すのみで<b>定義式を書いていない</b>（出典は同論文の参考文献 4 = Udengaard ら 1992）。</p>
+
+    <p>供給を CH₄ + CO₂ + H₂O とすると、原子比は</p>
+    <div class="eqcard">
+      <div class="cap"><span class="name">線図の座標</span><span class="unit">原子比</span></div>
+      <div class="eqbody">
+        <math display="block" xmlns="http://www.w3.org/1998/Math/MathML">
+          <mi>C</mi><mo>=</mo><mtext>CH₄</mtext><mo>+</mo><mtext>CO₂</mtext><mo>,</mo><mspace width="1.2em"/>
+          <mi>H</mi><mo>=</mo><mn>4</mn><mtext>CH₄</mtext><mo>+</mo><mn>2</mn><mtext>H₂O</mtext><mo>,</mo><mspace width="1.2em"/>
+          <mi>O</mi><mo>=</mo><mn>2</mn><mtext>CO₂</mtext><mo>+</mo><mtext>H₂O</mtext>
+        </math>
+      </div>
+    </div>
+    <p>となり、CH₄+CO₂ のみなら <b>(0, 4) → (2, 0)</b> の直線、CH₄+H₂O のみなら <b>(0, 4) から傾き 2</b> の直線。この 2 本が到達可能領域の左境界（V 字）を成す。与えられた (O/C, H/C) に対し <b>まず T・P で平衡組成を求め、その組成で a<sub>C</sub> を評価</b>する（“principle of equilibrated gas”）。</p>
+
+    <figure>
+      <img src="carbon_limit_1.5MPa.png" alt="炭素析出限界線図 1.5 MPa">
+      <figcaption>本実装で描いた析出限界線図（1.5 MPa = 原論文 Fig.4 と同条件）。曲線の左が a<sub>C</sub> &gt; 1（析出）、右が a<sub>C</sub> ≤ 1（炭素フリー）。高温ほど左＝より低い O/C まで炭素フリー。生成: <code>examples/example_carbon_limit.py</code></figcaption>
+    </figure>
+
+    <div class="tbl-scroll">
+      <table>
+        <caption>照合 — a_C = 1 の O/C 比（原論文 Fig.4 を実際にレンダリングして読み取った値と比較）</caption>
+        <thead><tr><th>H/C</th><th>T</th><th>本実装</th><th>Fig.4 読み取り</th><th>差</th></tr></thead>
+        <tbody>
+          <tr><td>4.0</td><td>950 ℃</td><td>1.008</td><td>1.007</td><td class="match">+0.001</td></tr>
+          <tr><td>4.0</td><td>900 ℃</td><td>1.067</td><td>1.131</td><td>−0.064</td></tr>
+          <tr><td>4.0</td><td>800 ℃</td><td>1.323</td><td>1.366</td><td>−0.043</td></tr>
+          <tr><td>4.0</td><td>700 ℃</td><td>1.699</td><td>1.710</td><td class="match">−0.011</td></tr>
+          <tr><td>4.0</td><td>600 ℃</td><td>1.987</td><td>2.000</td><td class="match">−0.013</td></tr>
+          <tr><td>2.0</td><td>950 ℃</td><td>1.122</td><td>1.159</td><td>−0.037</td></tr>
+          <tr><td>2.0</td><td>900 ℃</td><td>1.218</td><td>1.255</td><td>−0.037</td></tr>
+          <tr><td>2.0</td><td>800 ℃</td><td>1.552</td><td>1.600</td><td>−0.048</td></tr>
+          <tr><td>2.0</td><td>700 ℃</td><td>1.959</td><td>1.959</td><td class="match">±0.000</td></tr>
+          <tr><td>2.0</td><td>600 ℃</td><td>2.249</td><td>2.207</td><td>+0.042</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p>10 点すべてで差は <b>±0.064 以内</b>。図の線幅だけで約 0.03 相当なので<b>読み取り誤差の範囲で一致</b>する。曲線の順序（950 &lt; 900 &lt; 800 &lt; 700 &lt; 600）、形状、上端が H/C ≈ 5.7 で境界に収束する点も一致。原論文は炭素限界曲線の圧力を明記していないが、<b>1.5 MPa と推定して一致した</b>（H₂/CO 線について「950 ℃・1.5 MPa」と書かれている値）。</p>
+
+    <div class="note acc">
+      <p class="h">確認できたこと / できていないこと</p>
+      <p><b>できた:</b> §1 の定義（3 反応・平衡気相・黒鉛基準）で原論文の図が再現できる。</p>
+      <p><b>できていない:</b> 原論文自身は定義式を書いていないので、これは「同じ結果を出す定義に到達した」確認であって「千代田が使った式そのものの確認」ではない。定義の一次出典である <b>Udengaard ら 1992（Oil &amp; Gas J.）は未入手</b>（商業誌）。</p>
+    </div>
+  </section>
+
+  <!-- ============ ウィスカー ============ -->
+  <section id="whisker">
+    <div class="sec-head">
+      <h2>5 &nbsp;黒鉛基準の限界 — ウィスカーカーボン</h2>
+      <span class="tag">Rostrup-Nielsen</span>
+    </div>
+    <p class="cite">一次出典: J. R. Rostrup-Nielsen, “Equilibria of decomposition reactions of carbon monoxide and methane over nickel catalysts”, <i>J. Catal.</i> <b>27</b> 343–356 (1972) · DOI 10.1016/0021-9517(72)90170-4 · <b>未入手</b></p>
+
+    <p><b>ここが実装上いちばん重要な留保。</b> Ni 触媒上で成長する炭素は<b>黒鉛ではなくウィスカー（フィラメント）状炭素</b>で、黒鉛より自由エネルギーが高い（＝不安定）。そのため <b>a<sub>C</sub> = 1（黒鉛基準）を超えても、すぐには析出しない</b>。Rostrup-Nielsen 1972 はこのずれを Ni・Ni-Cu 触媒で測定した原著で、CO + CO₂ 系のほうが CH₄ + H₂ 系よりずれが大きいことを示している。</p>
+
+    <p>Alstrup らの粒子径依存性と組み合わせて、黒鉛からのずれは次の形で整理されている（二次資料による引用。<b>一次確認は未了</b>）。</p>
+
+    <div class="eqcard">
+      <div class="cap"><span class="name">ウィスカーカーボンの補正</span><span class="unit">kJ·mol⁻¹ · d [nm]</span></div>
+      <div class="eqbody">
+        <math display="block" xmlns="http://www.w3.org/1998/Math/MathML">
+          <mi>&#916;</mi><msub><mi>G</mi><mrow><mi>c</mi><mo>,</mo><mtext>dev</mtext></mrow></msub>
+          <mo>=</mo><mn>2.6</mn><mo>+</mo><mfrac><mn>93</mn><mi>d</mi></mfrac>
+          <mspace width="1.6em"/>
+          <msub><mi>a</mi><mrow><mi>C</mi><mo>,</mo><mtext>crit</mtext></mrow></msub>
+          <mo>=</mo><mi>exp</mi>
+          <mrow><mo>(</mo><mfrac><mrow><mi>&#916;</mi><msub><mi>G</mi><mrow><mi>c</mi><mo>,</mo><mtext>dev</mtext></mrow></msub></mrow><mrow><mi>R</mi><mi>T</mi></mrow></mfrac><mo>)</mo></mrow>
+        </math>
+      </div>
+    </div>
+
+    <div class="tbl-scroll">
+      <table>
+        <caption>析出開始のしきい値 a_C,crit（黒鉛基準の a_C がこの値を超えて初めて析出）</caption>
+        <thead><tr><th>Ni 粒子径 d</th><th>ΔG<sub>c,dev</sub></th><th>700 ℃</th><th>800 ℃</th><th>850 ℃</th><th>900 ℃</th><th>950 ℃</th></tr></thead>
+        <tbody>
+          <tr><td>7 nm</td><td>15.89</td><td>7.12</td><td>5.93</td><td>5.48</td><td>5.10</td><td>4.77</td></tr>
+          <tr><td>10 nm</td><td>11.90</td><td>4.35</td><td>3.80</td><td>3.58</td><td>3.39</td><td>3.22</td></tr>
+          <tr><td>20 nm</td><td>7.25</td><td>2.45</td><td>2.25</td><td>2.17</td><td>2.10</td><td>2.04</td></tr>
+          <tr><td>50 nm</td><td>4.46</td><td>1.74</td><td>1.65</td><td>1.61</td><td>1.58</td><td>1.55</td></tr>
+          <tr><td>100 nm</td><td>3.53</td><td>1.55</td><td>1.49</td><td>1.46</td><td>1.44</td><td>1.41</td></tr>
+          <tr><td>∞（黒鉛極限）</td><td>2.60</td><td>1.38</td><td>1.34</td><td>1.32</td><td>1.31</td><td>1.29</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p>つまり <b>a<sub>C</sub> ≤ 1 という判定は常に保守側</b>（実際より早めに「析出する」と言う）。900 ℃・d = 20 nm なら実際のしきい値は a<sub>C</sub> ≈ 2.1 で、<b>2 倍の余裕がある</b>。粒子径が小さいほどしきい値は上がる（微粒子ほど析出しにくい）。</p>
+
+    <div class="note">
+      <p class="h">実測との整合 — 村長 1961</p>
+      <p>村長 潔（東北肥料）は CH₄–H₂O–CO₂ 系の炭素析出曲線を 595–982 ℃ で実測し、<b>「温度 816 ℃以上では実験値と理論値はほぼ一致するが、706 ℃以下では全般に実験値の方が低く」</b>と報告している。低温側で「理論より析出しにくい」のは上記のずれと同じ向き。本プロジェクトの運転温度 850–900 ℃ は「ほぼ一致」する範囲に入る。</p>
+    </div>
+
+    <div class="note">
+      <p class="h">千代田化工の立ち位置 — a_C ≤ 1 は同社触媒を前提にしない条件</p>
+      <p>AIChE 2008 原文: “operations on the <b>left side of the carbon limit curve are more economical</b> … But in these conditions, product synthesis gases have <b>high thermodynamic potential for carbon formation</b>. In our process, feed gas conditions on the left side of carbon limit line <b>could be selected because our catalyst has high resistance against carbon formation</b>.”</p>
+      <p>つまり CT-CO2AR® は「a<sub>C</sub> ≤ 1 を守る技術」ではなく <b>「a<sub>C</sub> &gt; 1 の領域でも運転できる触媒」</b>。したがって本プロジェクトが課している a<sub>C</sub> ≤ 1 は、<b>同社触媒を前提にしない保守的な条件</b>にあたる。</p>
+    </div>
+  </section>
+
+  <!-- ============ 実装 ============ -->
+  <section id="impl">
+    <div class="sec-head">
+      <h2>6 &nbsp;chemflow2 での実装</h2>
+      <span class="tag">core/carbon_activity.py</span>
+    </div>
+    <p class="cite"><code>chemflow2/core/carbon_activity.py</code>（計算）・<code>Problem.constrain_carbon_activity</code>（制約）・<code>examples/example_carbon_limit.py</code>（線図）・<code>tests/test_carbon_activity.py</code>（13 件）</p>
+
+    <div class="eqcard">
+      <div class="cap"><span class="name">API</span><span class="unit">python</span></div>
+      <div class="eqbody">
+<pre style="margin:0;font-family:var(--mono);font-size:12.5px;line-height:1.7;overflow-x:auto;">from chemflow2.core.carbon_activity import carbon_activity_of
+
+a = carbon_activity_of(ReactOut)                    # 出口条件で評価（3 経路の最大値）
+a = carbon_activity_of(ReactOut, per_route=True)    # 経路別（非平衡気相の診断用）
+
+problem.constrain_carbon_activity(ReactOut, 1.0, T=900, P="1.04MPaG")   # 制約 1 本</pre>
+      </div>
+    </div>
+
+    <div class="note acc">
+      <p class="h">なぜ「a_C = 1」で課すのか — 不等式は等式系に載らない</p>
+      <p>chemflow2 は<b>自由度が釣り合った等式系</b>なので、a<sub>C</sub> ≤ 1 という不等式はそのままでは載らない。代わりに <b>a<sub>C</sub> = 1 を課して限界そのものを解く</b>。自由変数を 1 つ開けておけば、その変数の限界値が直接求まる（水蒸気供給を未知にすれば「炭素析出しない最小の水蒸気量」）。</p>
+      <p><b>残差は log(a<sub>C</sub>) − log(value) を使う。</b> 差の形だと反復の途中で分母の分圧が 0 に近づいて 1e300 に飛び、実際に overflow して収束しなかった。零点は同じで、条件数だけが桁違いに良くなる。</p>
+    </div>
+
+    <div class="tbl-scroll">
+      <table>
+        <caption>pattern1 の運転点（O/C = 1.726, H/C = 2.902, 1.04 MPaG）</caption>
+        <thead><tr><th>T</th><th>a<sub>C</sub></th><th>その温度の限界 O/C</th><th>余裕</th><th>判定</th></tr></thead>
+        <tbody>
+          <tr><td>800 ℃</td><td>0.619</td><td>1.421</td><td>+0.305</td><td class="rolecol">炭素フリー</td></tr>
+          <tr><td>850 ℃</td><td>0.394</td><td>1.248</td><td>+0.478</td><td class="rolecol">炭素フリー</td></tr>
+          <tr><td>900 ℃</td><td>0.235</td><td>1.130</td><td>+0.596</td><td class="rolecol">炭素フリー</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p>H₂/CO = 1.3837 と CH₄ 転化率 88.62% を維持する条件下では、<b>現行圧力では炭素活量の制約は効いていない</b>（a<sub>C</sub> ≤ 0.50）。制約が下限を決めるようになるのは圧力を 0.1 MPaG 程度まで下げたときで、そこでは転化率制約のほうが自動的に満たされる側に回る。</p>
+  </section>
+
+  <footer>
+    <h3>出典</h3>
+
+    <p class="foot-grp">§1・§5 炭素活量の一次出典</p>
+    <ul>
+      <li><span class="f">未入手</span><span class="d">J. R. Rostrup-Nielsen. “Equilibria of decomposition reactions of carbon monoxide and methane over nickel catalysts.” <i>J. Catal.</i> <b>27</b>(3), 343–356 (1972). <a class="doi" href="https://doi.org/10.1016/0021-9517(72)90170-4">10.1016/0021-9517(72)90170-4</a> 〔<b>原著</b>。Ni 上の炭素平衡が黒鉛平衡からずれることを実測。ウィスカーカーボン補正の一次出典〕</span></li>
+      <li><span class="f">未入手</span><span class="d">N. R. Udengaard, J.-H. Bak Hansen, D. C. Hanson, J. A. Stal. “Sulfur passivated reforming process lowers syngas H₂/CO ratio.” <i>Oil &amp; Gas J.</i> <b>90</b>(10), 62–67 (1992). 〔DOI なし（商業誌）。AIChE 2008 が carbon limit diagram の出典として引く参考文献 4。Topsøe の SPARG プロセス〕</span></li>
+      <li><span class="f">未入手</span><span class="d">J. R. Rostrup-Nielsen, J.-H. Bak Hansen. “CO₂-Reforming of Methane over Transition Metals.” <i>J. Catal.</i> <b>144</b>(1), 38–49 (1993). <a class="doi" href="https://doi.org/10.1006/jcat.1993.1312">10.1006/jcat.1993.1312</a> 〔AIChE 2008 の参考文献 1。貴金属は Ni より炭素生成活性が低いという触媒設計の根拠〕</span></li>
+      <li><span class="f">未入手</span><span class="d">J. R. Rostrup-Nielsen. “Sulfur-passivated nickel catalysts for carbon-free steam reforming of methane.” <i>J. Catal.</i> <b>85</b>(1), 31–43 (1984). <a class="doi" href="https://doi.org/10.1016/0021-9517(84)90107-6">10.1016/0021-9517(84)90107-6</a> 〔SPARG の基礎。硫黄被覆で炭素核生成を阻害〕</span></li>
+    </ul>
+
+    <p class="foot-grp">§4 本プロジェクトでの利用元（千代田化工建設）</p>
+    <ul>
+      <li><span class="f">Mikuriya_Yagi_Shimura_2008_AIChE_CO2_H2O_reforming.pdf ✅取得済</span><span class="d">T. Mikuriya, F. Yagi, M. Shimura. “Development of a new Synthesis Gas Production Catalyst and Process with CO₂ and H₂O Reforming.” <i>AIChE Annual Meeting</i>, Philadelphia, PA, Nov. 16–21 (2008), 8 pp. 〔DOI なし（会議発表）。<b>Fig.4 に “Carbon Activity = 1” の等高線</b>。定義式は書かれておらず出典は参考文献 4〕</span></li>
+      <li><span class="f">未入手</span><span class="d">八木 冬樹. 「CO₂ を原料として合成ガスを製造する CO₂/H₂O リフォーミングプロセス」<i>触媒</i> <b>51</b>(5), 331–335 (2009). 〔DOI なし。日本語版。非オープンアクセス〕</span></li>
+      <li><span class="f">未入手</span><span class="d">八木 冬樹. 「CO₂ を原料とする合成ガス製造プロセス」<i>ペトロテック</i> <b>34</b>(6), 378–383 (2011). 〔DOI なし。日本語版。非オープンアクセス〕</span></li>
+      <li><span class="f">未入手</span><span class="d">八木 冬樹. 「CO₂ リフォーミングプロセスによる合成ガス製造」<i>日本エネルギー学会誌</i> <b>91</b>(4), 274–278 (2012). 〔DOI なし。日本語版。CiNii CRID 1520290882653584768。非オープンアクセス〕</span></li>
+    </ul>
+
+    <p class="foot-grp">§5 実測との照合（オープンアクセス）</p>
+    <ul>
+      <li><span class="f">未取得（無料 PDF あり）</span><span class="d">村長 潔. 「メタン-水蒸気-炭酸ガス反応における炭素析出とモル比」<i>工業化学雑誌</i> <b>64</b>(11), 1933–1938 (1961). <a class="doi" href="https://doi.org/10.1246/nikkashi1898.64.11_1933">10.1246/nikkashi1898.64.11_1933</a> 〔595–982 ℃ で析出曲線の実験値と平衡計算値を直接比較。<b>816 ℃以上なら平衡計算で予測してよい</b>根拠〕</span></li>
+      <li><span class="f">未取得（無料 PDF あり）</span><span class="d">冨重 圭一, 藤元 薫. 「メタンの炭酸ガスリフォーミング反応による合成ガス製造における触媒特性と炭素析出挙動解析 — NiO-MgO 固溶体触媒の開発」<i>石油学会誌</i> <b>44</b>(2), 65–79 (2001). <a class="doi" href="https://doi.org/10.1627/jpi1958.44.65">10.1627/jpi1958.44.65</a> 〔常圧では耐炭素析出だが<b>高圧では対策が必要</b>と報告〕</span></li>
+    </ul>
+
+    <p class="foot-grp">実装</p>
+    <ul>
+      <li><span class="f">chemflow2/core/carbon_activity.py</span><span class="d">a<sub>C</sub> の計算（3 経路・平衡定数・Stream からの評価）</span></li>
+      <li><span class="f">chemflow2/core/problem.py</span><span class="d"><code>Problem.constrain_carbon_activity</code>（対数残差）</span></li>
+      <li><span class="f">examples/example_carbon_limit.py</span><span class="d">析出限界線図の生成と原論文 Fig.4 との照合</span></li>
+      <li><span class="f">tests/test_carbon_activity.py</span><span class="d">平衡定数の検算・3 経路の一致・制約の自由度・限界の求解（13 件）</span></li>
+      <li><span class="f">references/PAPERS_INDEX.md</span><span class="d">文献調査の記録（探索したキーワードと入手状況）</span></li>
+    </ul>
+  </footer>
+</div>

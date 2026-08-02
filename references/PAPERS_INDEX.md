@@ -1,9 +1,36 @@
 # 文献インデックス（CO2 改質・炭素析出・炭素活量）
 
-調査日: 2026-08-01
+調査日: 2026-08-01 / 更新: 2026-08-02
 フォルダ名は sibling プロジェクト `../reaction_rate/references/` の慣例に合わせた。
 
 炭素活量 a_C ≤ 1 を pattern1（改質器）の運転制約として課すための根拠文献。
+
+**→ 内容のまとめは [`carbon_activity.html`](carbon_activity.html)**（定義・反応式・平衡定数・
+析出限界線図・原論文との照合・実装。`../reaction_rate/references/rate_equations.html` と同形式）
+
+---
+
+## 0. 炭素活量の一次出典 ★2026-08-02 特定
+
+- **J. R. Rostrup-Nielsen. "Equilibria of decomposition reactions of carbon monoxide
+  and methane over nickel catalysts." *J. Catal.* 27(3), 343–356 (1972).**
+- DOI: 10.1016/0021-9517(72)90170-4（解決確認済）
+- 入手: **未入手**
+- なぜ重要か: **Ni 触媒上の炭素平衡が黒鉛平衡からずれることを実測した原著。**
+  Ni 上で成長するのは黒鉛ではなく**ウィスカー（フィラメント）状炭素**で、黒鉛より
+  自由エネルギーが高い。したがって **a_C = 1（黒鉛基準）を超えてもすぐには析出しない**。
+  CO + CO2 系のほうが CH4 + H2 系よりずれが大きい。
+- 補正（Alstrup らの粒子径依存性と合わせた形。**二次資料からの引用・一次確認未了**）:
+  `ΔG_c,dev [kJ/mol] = 2.6 + 93/d(nm)`, `a_C,crit = exp(ΔG_c,dev / RT)`
+  → 900 ℃・d = 20 nm で a_C,crit ≈ 2.10。**a_C ≤ 1 は常に保守側**。
+
+関連（いずれも未入手・DOI 解決確認済）:
+- J. R. Rostrup-Nielsen. "Sulfur-passivated nickel catalysts for carbon-free steam
+  reforming of methane." *J. Catal.* 85(1), 31–43 (1984). DOI 10.1016/0021-9517(84)90107-6
+  〔SPARG の基礎〕
+- J. R. Rostrup-Nielsen, J.-H. Bak Hansen. "CO2-Reforming of Methane over Transition
+  Metals." *J. Catal.* 144(1), 38–49 (1993). DOI 10.1006/jcat.1993.1312
+  〔AIChE 2008 の参考文献 1。貴金属は Ni より炭素生成活性が低い＝触媒設計の根拠〕
 
 ---
 
