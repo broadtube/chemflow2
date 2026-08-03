@@ -88,7 +88,8 @@
   .eqcard .cap .name{font-family:var(--mono);font-size:12.5px;color:var(--accent-ink);}
   .eqcard .cap .unit{margin-left:auto;font-family:var(--mono);font-size:11.5px;color:var(--muted);}
   .eqcard .eqbody{padding:16px 18px;overflow-x:auto;}
-  math{font-size:17px;}
+  mjx-container[display]{margin:2px 0!important;}
+  .eqbody mjx-container{color:var(--ink);}
 
   .note{border-left:3px solid var(--amber);background:var(--amber-soft);border-radius:0 10px 10px 0;
     padding:14px 18px;margin:16px 0;font-size:14.5px;}
@@ -134,6 +135,16 @@
   a.doi:hover{border-bottom-color:var(--accent);}
   @media (max-width:560px){ .wrap{padding:0 16px 72px;} .bar-in{padding:10px 16px;} .rxns .lbl{display:none;} }
 </style>
+
+<script>
+  window.MathJax = {
+    tex: { inlineMath: [['\\(','\\)']], displayMath: [['\\[','\\]']] },
+    svg: { fontCache: 'global' },
+    options: { skipHtmlTags: ['script','noscript','style','textarea','pre','code'] }
+  };
+</script>
+<script id="MathJax-script" async
+        src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
 
 <nav class="bar">
   <div class="bar-in">
@@ -202,46 +213,21 @@
     <div class="eqcard">
       <div class="cap"><span class="name">a_C &nbsp;(B: Boudouard)</span><span class="unit">無次元</span></div>
       <div class="eqbody">
-        <math display="block" xmlns="http://www.w3.org/1998/Math/MathML">
-          <msub><mi>K</mi><mi>B</mi></msub><mo>=</mo>
-          <mfrac><mrow><msub><mi>a</mi><mi>C</mi></msub><msub><mi>p</mi><mrow><mtext>CO</mtext><mn>2</mn></mrow></msub></mrow>
-                 <msubsup><mi>p</mi><mtext>CO</mtext><mn>2</mn></msubsup></mfrac>
-          <mo>&#8658;</mo>
-          <msub><mi>a</mi><mi>C</mi></msub><mo>=</mo>
-          <msub><mi>K</mi><mi>B</mi></msub>
-          <mfrac><msubsup><mi>p</mi><mtext>CO</mtext><mn>2</mn></msubsup><msub><mi>p</mi><mrow><mtext>CO</mtext><mn>2</mn></mrow></msub></mfrac>
-        </math>
+        \[ K_B \;=\; \frac{a_C\,p_{\mathrm{CO_2}}}{p_{\mathrm{CO}}^{2}}\qquad\Longrightarrow\qquad a_C \;=\; K_B\,\frac{p_{\mathrm{CO}}^{2}}{p_{\mathrm{CO_2}}} \]
       </div>
     </div>
 
     <div class="eqcard">
       <div class="cap"><span class="name">a_C &nbsp;(M: メタン分解)</span><span class="unit">無次元</span></div>
       <div class="eqbody">
-        <math display="block" xmlns="http://www.w3.org/1998/Math/MathML">
-          <msub><mi>K</mi><mi>M</mi></msub><mo>=</mo>
-          <mfrac><mrow><msub><mi>a</mi><mi>C</mi></msub><msubsup><mi>p</mi><mrow><mtext>H</mtext><mn>2</mn></mrow><mn>2</mn></msubsup></mrow>
-                 <msub><mi>p</mi><mrow><mtext>CH</mtext><mn>4</mn></mrow></msub></mfrac>
-          <mo>&#8658;</mo>
-          <msub><mi>a</mi><mi>C</mi></msub><mo>=</mo>
-          <msub><mi>K</mi><mi>M</mi></msub>
-          <mfrac><msub><mi>p</mi><mrow><mtext>CH</mtext><mn>4</mn></mrow></msub><msubsup><mi>p</mi><mrow><mtext>H</mtext><mn>2</mn></mrow><mn>2</mn></msubsup></mfrac>
-        </math>
+        \[ K_M \;=\; \frac{a_C\,p_{\mathrm{H_2}}^{2}}{p_{\mathrm{CH_4}}}\qquad\Longrightarrow\qquad a_C \;=\; K_M\,\frac{p_{\mathrm{CH_4}}}{p_{\mathrm{H_2}}^{2}} \]
       </div>
     </div>
 
     <div class="eqcard">
       <div class="cap"><span class="name">a_C &nbsp;(R: CO 還元)</span><span class="unit">無次元</span></div>
       <div class="eqbody">
-        <math display="block" xmlns="http://www.w3.org/1998/Math/MathML">
-          <msub><mi>K</mi><mi>R</mi></msub><mo>=</mo>
-          <mfrac><mrow><msub><mi>a</mi><mi>C</mi></msub><msub><mi>p</mi><mrow><mtext>H</mtext><mn>2</mn><mtext>O</mtext></mrow></msub></mrow>
-                 <mrow><msub><mi>p</mi><mtext>CO</mtext></msub><msub><mi>p</mi><mrow><mtext>H</mtext><mn>2</mn></mrow></msub></mrow></mfrac>
-          <mo>&#8658;</mo>
-          <msub><mi>a</mi><mi>C</mi></msub><mo>=</mo>
-          <msub><mi>K</mi><mi>R</mi></msub>
-          <mfrac><mrow><msub><mi>p</mi><mtext>CO</mtext></msub><msub><mi>p</mi><mrow><mtext>H</mtext><mn>2</mn></mrow></msub></mrow>
-                 <msub><mi>p</mi><mrow><mtext>H</mtext><mn>2</mn><mtext>O</mtext></mrow></msub></mfrac>
-        </math>
+        \[ K_R \;=\; \frac{a_C\,p_{\mathrm{H_2O}}}{p_{\mathrm{CO}}\,p_{\mathrm{H_2}}}\qquad\Longrightarrow\qquad a_C \;=\; K_R\,\frac{p_{\mathrm{CO}}\,p_{\mathrm{H_2}}}{p_{\mathrm{H_2O}}} \]
       </div>
     </div>
 
@@ -298,16 +284,8 @@
     <div class="eqcard">
       <div class="cap"><span class="name">平衡定数</span><span class="unit">無次元 · p° = 1 atm</span></div>
       <div class="eqbody">
-        <math display="block" xmlns="http://www.w3.org/1998/Math/MathML">
-          <mi>K</mi><mo>=</mo><mi>exp</mi>
-          <mrow><mo>(</mo><mo>&#8722;</mo>
-            <mfrac><mrow><mi>&#916;</mi><msup><mi>G</mi><mo>&#176;</mo></msup></mrow><mrow><mi>R</mi><mi>T</mi></mrow></mfrac>
-          <mo>)</mo></mrow>
-          <mo>,</mo><mspace width="1em"/>
-          <mi>&#916;</mi><msup><mi>G</mi><mo>&#176;</mo></msup><mo>=</mo>
-          <munder><mo>&#8721;</mo><mi>i</mi></munder><msub><mi>&#957;</mi><mi>i</mi></msub><msubsup><mi>g</mi><mi>i</mi><mo>&#176;</mo></msubsup>
-          <mspace width="1em"/><mo>(</mo><mtext>C(gr) を含む</mtext><mo>)</mo>
-        </math>
+        \[ K \;=\; \exp\!\left(-\frac{\Delta G^{\circ}}{RT}\right),\qquad \Delta G^{\circ} \;=\; \sum_i \nu_i\, g_i^{\circ} \]
+        <p style="margin:8px 0 0;font-size:13.5px;color:var(--muted)">ν は化学量論係数。和は <b>C(gr) を含む</b>全成分について取る。</p>
       </div>
     </div>
 
@@ -341,11 +319,7 @@
     <div class="eqcard">
       <div class="cap"><span class="name">線図の座標</span><span class="unit">原子比</span></div>
       <div class="eqbody">
-        <math display="block" xmlns="http://www.w3.org/1998/Math/MathML">
-          <mi>C</mi><mo>=</mo><mtext>CH₄</mtext><mo>+</mo><mtext>CO₂</mtext><mo>,</mo><mspace width="1.2em"/>
-          <mi>H</mi><mo>=</mo><mn>4</mn><mtext>CH₄</mtext><mo>+</mo><mn>2</mn><mtext>H₂O</mtext><mo>,</mo><mspace width="1.2em"/>
-          <mi>O</mi><mo>=</mo><mn>2</mn><mtext>CO₂</mtext><mo>+</mo><mtext>H₂O</mtext>
-        </math>
+        \[ C = \mathrm{CH_4} + \mathrm{CO_2}, \qquad H = 4\,\mathrm{CH_4} + 2\,\mathrm{H_2O}, \qquad O = 2\,\mathrm{CO_2} + \mathrm{H_2O} \]
       </div>
     </div>
     <p>となり、CH₄+CO₂ のみなら <b>(0, 4) → (2, 0)</b> の直線、CH₄+H₂O のみなら <b>(0, 4) から傾き 2</b> の直線。この 2 本が到達可能領域の左境界（V 字）を成す。与えられた (O/C, H/C) に対し <b>まず T・P で平衡組成を求め、その組成で a<sub>C</sub> を評価</b>する（“principle of equilibrated gas”）。</p>
@@ -481,14 +455,7 @@
     <div class="eqcard">
       <div class="cap"><span class="name">ウィスカーカーボンの補正（参考値）</span><span class="unit">kJ·mol⁻¹ · d [nm]</span></div>
       <div class="eqbody">
-        <math display="block" xmlns="http://www.w3.org/1998/Math/MathML">
-          <mi>&#916;</mi><msub><mi>G</mi><mrow><mi>c</mi><mo>,</mo><mtext>dev</mtext></mrow></msub>
-          <mo>=</mo><mn>2.6</mn><mo>+</mo><mfrac><mn>93</mn><mi>d</mi></mfrac>
-          <mspace width="1.6em"/>
-          <msub><mi>a</mi><mrow><mi>C</mi><mo>,</mo><mtext>crit</mtext></mrow></msub>
-          <mo>=</mo><mi>exp</mi>
-          <mrow><mo>(</mo><mfrac><mrow><mi>&#916;</mi><msub><mi>G</mi><mrow><mi>c</mi><mo>,</mo><mtext>dev</mtext></mrow></msub></mrow><mrow><mi>R</mi><mi>T</mi></mrow></mfrac><mo>)</mo></mrow>
-        </math>
+        \[ \Delta G_{c,\mathrm{dev}} \;=\; 2.6 + \frac{93}{d}\qquad\qquad a_{C,\mathrm{crit}} \;=\; \exp\!\left(\frac{\Delta G_{c,\mathrm{dev}}}{RT}\right) \]
       </div>
     </div>
 
