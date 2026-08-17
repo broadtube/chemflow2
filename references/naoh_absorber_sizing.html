@@ -450,7 +450,7 @@
       <h2>9 &nbsp;⚠ そもそもこの塔を作る価値があるか — 総当たり計算の結論</h2>
       <span class="tag">26 runs</span>
     </div>
-    <p class="cite">出どころ: 改質条件 4 種 × 除去位置 2 種 × η = 0.5/0.9/0.99 の総当たり（28 runs 中 26 成功）。<code>examples/example_co2_removal.py</code>。</p>
+    <p class="cite">出どころ: 改質条件 4 種 × 除去位置 2 種 × η = 0.5/0.9/0.99 の総当たり 28 runs（うち 2 点は残差ノルムの絶対判定 1e-6 をわずかに外したため solve_tol を 1e-5 に緩めて解き直した。残差 1.8e-6 / 2.4e-6 は流量 50 mol/h 規模に対し相対 4e-8 で、物理的には収束済み）。<code>examples/example_co2_removal.py</code>。</p>
 
     <div class="note">
       <p class="h">⚠ CO₂ 除去は 26 runs すべてで酢酸メチルを減らした。例外なし。</p>
@@ -464,6 +464,7 @@
         <tbody>
           <tr><td>除去なし</td><td class="match">1.0416</td><td class="match">88.03</td><td>305.1</td><td class="rolecol">最良</td></tr>
           <tr><td>(a) 前段 η = 0.5</td><td>1.0103</td><td>85.38</td><td>242.7</td><td class="rolecol">−3.0 %</td></tr>
+          <tr><td>(a) 前段 η = 0.9</td><td>0.9368</td><td>79.17</td><td>210.0</td><td class="rolecol">−10.1 %</td></tr>
           <tr><td>(a) 前段 η = 0.99</td><td>0.9102</td><td>76.92</td><td>206.8</td><td class="rolecol">−12.6 %</td></tr>
           <tr><td>(b) 循環 η = 0.5</td><td class="diff">0.8572</td><td>72.44</td><td>207.6</td><td class="rolecol">−17.7 %</td></tr>
           <tr><td>(b) 循環 η = 0.9</td><td class="diff">0.8525</td><td>72.04</td><td>214.3</td><td class="rolecol">−18.2 %</td></tr>

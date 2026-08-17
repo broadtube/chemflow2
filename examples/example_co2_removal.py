@@ -107,6 +107,16 @@ CAUSTIC = Reaction({"CO2": -1, "NaOH": -2, "Na2CO3": 1, "H2O": 1},
                    name="CO2 + 2NaOH -> Na2CO3 + H2O")
 
 
+def sheet_name(name: str) -> str:
+    """Excel のシート名は 31 文字まで。超える分は頭から詰める。
+
+    ラベルは「改質条件_ケース_eta_種別」の順で、種別（plant3/reformer/caustic）は
+    ファイル名でも区別できるので、切るなら末尾から。openpyxl は 31 文字超でも
+    書き込むが警告を出し、アプリによっては読めない。
+    """
+    return name[:31]
+
+
 # --------------------------------------------------------------------------- #
 # 吸収塔サブフローシート（既存ユニットの組み合わせ・新 Unit は作らない）
 # --------------------------------------------------------------------------- #
@@ -181,7 +191,7 @@ def report_caustic(label: str, gas_in: dict[str, float], eta: float, *, name: st
           f"({CAUSTIC.element_balance()})")
 
     to_excel(problem.streams, os.path.join(OUT, f"co2removal_{label}_caustic.xlsx"),
-             sheet=f"{label}_caustic", basis=["mol", "mole_frac", "mass"])
+             sheet=sheet_name(f"{label}_caustic"), basis=["mol", "mole_frac", "mass"])
     export_mermaid(problem, os.path.join(OUT, f"co2removal_{label}_caustic.html"),
                    title=f"{name} NaOH scrubber ({label}, eta={eta:.0%})", style="diamond")
     return Spent
@@ -190,10 +200,12 @@ def report_caustic(label: str, gas_in: dict[str, float], eta: float, *, name: st
 # --------------------------------------------------------------------------- #
 # 3 ケース
 # --------------------------------------------------------------------------- #
-def run_case(tag: str, eta: float, purge: float, reform: dict, label: str) -> dict:
+def run_case(tag: str, eta: float, purge: float, reform: dict, label: str,
+             solve_tol: float = 1e-6) -> dict:
     """1 ケース解いて、改質側 + plant3 側の指標を返す。
 
     tag は "baseline" / "a_upstream" / "b_recycle"、label は出力ファイル名の接頭辞。
+    solve_tol は plant3 の残差ノルム判定（p3.solve_with_sv 参照）。
     """
     print(f"\n{'=' * 78}\n=== {label}（η={eta:.0%}, パージ率={purge:.0%}）\n{'=' * 78}")
 
@@ -204,7 +216,7 @@ def run_case(tag: str, eta: float, purge: float, reform: dict, label: str) -> di
     print(f"改質器: H2O={H2Of.flow_of('H2O'):.4f} CO2供給={CO2f.flow_of('CO2'):.4f} mol/h")
     print(stream_table(rp.streams, basis=["mol", "mole_frac"]))
     to_excel(rp.streams, os.path.join(OUT, f"co2removal_{label}_reformer.xlsx"),
-             sheet=f"{label}_reformer", basis=["mol", "mole_frac"])
+             sheet=sheet_name(f"{label}_reformer"), basis=["mol", "mole_frac"])
     export_mermaid(rp, os.path.join(OUT, f"co2removal_{label}_reformer.html"),
                    title=f"Reformer + CO2 removal ({label})", style="diamond")
 
@@ -217,13 +229,13 @@ def run_case(tag: str, eta: float, purge: float, reform: dict, label: str) -> di
     feed = {f: PlantFeed.flow_of(f) for f in PlantFeed.formulas}
     plant_removal = eta if tag == "b_recycle" else None
     problem, streams, v_tot = p3.solve_with_sv(feed=feed, co2_removal=plant_removal,
-                                               purge=purge)
+                                               purge=purge, solve_tol=solve_tol)
     by_name = {s.name: s for s in problem.streams}
     Steam1, ReactorIn = by_name["1. Steam1"], by_name["2. ReactorIn"]
     Purge, MA = by_name["7. Purge"], by_name["9. MethylAcetate"]
     print(stream_table(problem.streams, basis=["mol", "mole_frac"]))
     to_excel(problem.streams, os.path.join(OUT, f"co2removal_{label}_plant3.xlsx"),
-             sheet=f"{label}_plant3", basis=["mol", "mole_frac", "mass", "normal_volume"])
+             sheet=sheet_name(f"{label}_plant3"), basis=["mol", "mole_frac", "mass", "normal_volume"])
     export_mermaid(problem, os.path.join(OUT, f"co2removal_{label}_plant3.html"),
                    title=f"plant3 + CO2 removal ({label})", style="diamond")
 
@@ -270,6 +282,8 @@ def main():
                     help=f"土台にする改質条件（{'/'.join(pp.CASES)}）")
     ap.add_argument("--purge", type=float, default=p3.PURGE,
                     help=f"パージ率（既定 {p3.PURGE}）")
+    ap.add_argument("--retry-tol", type=float, default=1e-5,
+                    help="1 回目が収束判定を外したときに使う緩和 solve_tol（既定 1e-5）")
     args = ap.parse_args()
 
     if args.reform not in pp.CASES:
@@ -296,16 +310,30 @@ def main():
 
     # 総当たりは数時間走るので、1 ケースが収束しなくても残りを続ける。
     # 落ちたケースは results に入れず、最後にまとめて報告する。
-    results, failed = {}, []
+    #
+    # 1 度目に失敗したら判定を 1 桁緩めて 1 回だけ再試行する。solve_tol は残差ノルムの
+    # **絶対値**なのでスケール依存で、既定の 1e-6 は流量 50 mol/h 規模の本問題では
+    # 相対 2e-8 に相当し厳しすぎる。実際 1.8e-6 で頭打ちになって落ちる点があった
+    # （物理的には収束済み）。緩めた解は results に retried 印をつけて区別する。
+    results, failed, retried = {}, [], []
     for i, (tag, eta, label) in enumerate(plan, 1):
         t0 = time.time()
         try:
             results[label] = run_case(tag, eta, args.purge, reform, label)
             print(f"[{i}/{len(plan)}] {label} 完了 ({time.time() - t0:.0f}s)")
         except Exception as e:                      # noqa: BLE001 — 打ち切らず続行
-            failed.append((label, f"{type(e).__name__}: {e}"))
-            print(f"[{i}/{len(plan)}] {label} 失敗 ({time.time() - t0:.0f}s): "
-                  f"{type(e).__name__}: {e}")
+            print(f"[{i}/{len(plan)}] {label} 1回目失敗: {type(e).__name__}: {e}")
+            print(f"    → solve_tol を {args.retry_tol:g} に緩めて再試行")
+            try:
+                results[label] = run_case(tag, eta, args.purge, reform, label,
+                                          solve_tol=args.retry_tol)
+                retried.append(label)
+                print(f"[{i}/{len(plan)}] {label} 完了（緩和判定） "
+                      f"({time.time() - t0:.0f}s)")
+            except Exception as e2:                 # noqa: BLE001
+                failed.append((label, f"{type(e2).__name__}: {e2}"))
+                print(f"[{i}/{len(plan)}] {label} 失敗 ({time.time() - t0:.0f}s): "
+                      f"{type(e2).__name__}: {e2}")
 
     if len(results) > 1:
         print(f"\n{'=' * 78}\n=== 除去位置の比較（改質条件 {args.reform} 固定・"
@@ -320,6 +348,9 @@ def main():
               "順方向 WGS が進んで CO が食われている。それが MA の減少と 1:3 で対応する\n"
               "なら、docstring 冒頭の予測どおり。対応しないなら別の機構を探す必要がある。")
 
+    if retried:
+        print(f"\n※ 緩和判定（solve_tol={args.retry_tol:g}）で解いたケース {len(retried)} 件: "
+              f"{', '.join(retried)}")
     if failed:
         print(f"\n⚠ 収束しなかったケース {len(failed)} 件:")
         for label, msg in failed:

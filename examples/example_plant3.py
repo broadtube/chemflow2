@@ -191,7 +191,8 @@ RECYCLE_GUESS = 6.5
 
 def solve_with_sv(max_outer: int = 8, tol: float = 1e-4, verbose: bool = True,
                   feed: dict[str, float] | None = None,
-                  co2_removal: float | None = None, purge: float = PURGE):
+                  co2_removal: float | None = None, purge: float = PURGE,
+                  solve_tol: float = 1e-6):
     """SV 一定（反応器入口基準）になるまで触媒体積 V を外側反復して解く。
 
     g(V) = volume_for(反応器入口流量(V)) − V の零点を**割線法**で探す。
@@ -199,6 +200,11 @@ def solve_with_sv(max_outer: int = 8, tol: float = 1e-4, verbose: bool = True,
     各求解は前回解をそのまま初期推定に使う（ウォームスタート）。
     feed で新鮮供給の組成を差し替えられる（既定は STEAM1）。
     co2_removal / purge は build() にそのまま渡す（除去位置 (b) 用）。
+
+    solve_tol は Problem.solve の収束判定に使う **残差ノルムの絶対値**（既定 1e-6）。
+    絶対値なのでスケール依存で、流量が 50 mol/h 規模の本問題では 1e-6 は相対 2e-8 に
+    相当し、かなり厳しい。実際 1.8e-6 で頭打ちになって「収束せず」と判定される
+    ケースがある（物理的には十分収束している）。そういうときだけ緩めるための口。
     """
     feed = feed if feed is not None else STEAM1
     state: dict[str, object] = {}
@@ -209,7 +215,7 @@ def solve_with_sv(max_outer: int = 8, tol: float = 1e-4, verbose: bool = True,
                                  co2_removal=co2_removal, purge=purge)
         if it == 1 and verbose:
             print("自由度 (変数, 方程式):", problem.degrees_of_freedom())
-        sol = problem.solve(bounds=(0, np.inf), tol=1e-6,
+        sol = problem.solve(bounds=(0, np.inf), tol=solve_tol,
                             ftol=1e-12, xtol=1e-12, gtol=1e-12)
         if not sol.success:
             raise RuntimeError(f"外側反復 {it} で収束せず: {sol}")
