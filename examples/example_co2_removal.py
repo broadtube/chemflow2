@@ -1,0 +1,330 @@
+"""サンプル: 循環系の CO2 希釈を解消する — 除去位置 (a)/(b) の比較。
+
+example_pattern1_plant3.py の結論「不活性（CO2+CH4）最小化は MA 生産では裏目」を受けて、
+**改質器への CO2 供給は A_base のまま（= ドライリフォーミングの取り分は捨てない）**、
+CO2 を**どこで抜くか**だけを変えて比較する。
+
+    baseline  除去なし（= A_base をそのまま plant3 へ）
+    (a) 前段  改質器の下流・plant3 へ渡す手前で抜く   T-100（solve_reformer の中）
+    (b) 循環  凝縮器出口ガスとパージ分岐の"間"で抜く  T-101（p3.build の中）
+
+    (a)  RG+CO2+H2O → G1 → 凝縮 → DryGas ─[T-100]→ PlantFeed → plant3（塔なし）
+    (b)  ... → DryGas → plant3: 反応器 → 凝縮器 → CondGas ─[T-101]→ ScrubbedGas
+                                                                 → パージ / 循環
+
+**(b) をパージより手前に置く理由**: CO2 を先に抜けばパージすべき蓄積成分が CH4 だけに
+なるので、同じ CH4 濃度をパージ率を下げて達成できる（= CO パージ損失が減る）。
+この効果は下の WGS の話とは独立に効く。本スクリプトは第一段としてパージ率を 5% に
+固定して比べる（--purge で上書き可）。
+
+────────────────────────────────────────────────────────────────────────
+⚠️ 事前の予測: **CO2 除去は MA を減らす可能性が高い。**
+────────────────────────────────────────────────────────────────────────
+example_pattern1_plant3 の出力を物質収支で読み直すと、CO2 は全ケースで循環系の中で
+**正味"生成"側**だった（供給 < パージ）。つまり動いているのは RWGS ではなく順方向の
+水性ガスシフト CO + H2O → CO2 + H2 で、これは **CO を食う**反応。
+
+    ケース      供給CO2   パージCO2   正味生成    MA
+    A_base       1.675      1.767     +0.092    1.0416
+    C_03MPaG     0.174      0.517     +0.344    0.9653
+
+A→C で増えた正味生成 0.252 mol/h は、減った MA 0.076 × 3 = 0.229 mol の CO とほぼ一致
+する。**ループ内の CO2 は WGS の生成物側阻害として CO を守っていた**、というのがデータの
+読み。だとすれば CO2 を抜くほど WGS が進んで CO が失われる。
+
+一方で希釈が解消して CO 分圧が上がる分、MA 合成速度は上がり触媒量は減る。差し引きは
+計算しないと決まらない。**このスクリプトはその差し引きを測るためのもの**であって、
+CO2 除去が良いという前提で書かれてはいない。
+
+────────────────────────────────────────────────────────────────────────
+苛性ソーダ吸収塔の扱い（4. の設計）
+────────────────────────────────────────────────────────────────────────
+吸収塔がガスループに及ぼす影響は「CO2 除去率 η」ただ 1 つに縮退する（苛性液側の情報は
+ガスに戻らない）。そこで 2 つに分ける:
+
+  主フローシート  Separator 1 個 + 回収率制約 1 本。循環求解（121変数・約10分）を
+                  重くしない。上の T-100 / T-101 がこれ。
+  吸収塔サブ      Mixer + Reactor + Separator。NaOH 消費・Na2CO3 廃液・原子収支を出す。
+                  主解を入力に一瞬で解ける。caustic_scrubber() がこれ。
+
+**新しい Unit は作らない**。Separator の設計思想（ユニットは収支だけを課し、分配は制約で
+決める）にそのまま乗るうえ、Reactor を使えば Reaction の原子収支検査が自動でかかるため。
+
+    CO2 + 2NaOH → Na2CO3 + H2O     C:1=1  O:4=4  H:2=2  Na:2=2 で閉じる
+
+（液中では CO2 + OH⁻ → HCO3⁻ → CO3²⁻ の 2 段だが正味は同じ。過剰 NaOH がある限り
+炭酸水素塩まで戻らないので 1 式で足りる。EXCESS がその余裕。）
+
+**塔の寸法（塔高・充填量・塔径）は chemflow2 の外**。η → 寸法の手計算は
+`references/naoh_absorber_sizing.html` にまとめてある（NTU = ln(1/(1-η))、
+V = NTU·G/(k_G a·P)、Hatta 数による律速域の確認、実験規模の薬剤量と濡れ性の制約）。
+結論だけ言うと、本件の規模では必要充填体積は数十 mL のオーダーで、**塔の寸法を実際に
+決めるのは物質移動ではなく濡れ性・液分散・耐圧**のほう。
+
+実行: PYTHONPATH=.:../reaction_rate/src python3 examples/example_co2_removal.py
+      PYTHONPATH=... python3 examples/example_co2_removal.py --eta 0.9 --cases a,b
+要 Cantera（改質器）と reaction_rate（速度論反応器）。plant3 は 1 ケース約 10 分。
+"""
+
+import argparse
+import os
+import time
+
+import examples.example_pattern1_plant3 as pp
+import examples.example_plant3 as p3
+from chemflow2 import (
+    Mixer,
+    Problem,
+    Reaction,
+    Reactor,
+    Separator,
+    Stream,
+    StreamCondition,
+    export_mermaid,
+    stream_table,
+    to_excel,
+)
+
+OUT = os.path.join(os.path.dirname(__file__), "output")
+
+#: 比較の土台にする改質条件（既定は A_base = 現状条件）。--reform で切り替える。
+#: 1 回の比較の中では固定すること。動かすと「改質条件を変えた効果」と
+#: 「除去位置の効果」が混ざって読めなくなる。
+#:
+#: なお改質条件と CO2 除去は**同じレバー**（どちらもループ CO2 を下げる）なので、
+#: 4 条件 × 2 位置 × η の総当たりは半分近くが縮退する:
+#:   - (a) 前段除去は C/D では抜くものがほとんど無い（DryGas CO2 が 0.17/0.09 mol/h）
+#:   - (b) 循環除去は 4 条件すべてで効く（ループ内で WGS が CO2 を作り続けるため）
+#: 総当たりを回す前に、まず 1 条件で η を振って向きを決めること。
+BASE_CASE = dict(pp.CASES["A_base"])
+
+#: 苛性ソーダの化学量論に対する過剰率。過剰 NaOH が無いと炭酸水素塩側に寄るので余裕を持つ。
+EXCESS = 1.2
+#: 苛性ソーダ水溶液の濃度 [wt%]。工業的な希釈苛性の常用域。
+NAOH_WT = 0.20
+
+CAUSTIC = Reaction({"CO2": -1, "NaOH": -2, "Na2CO3": 1, "H2O": 1},
+                   name="CO2 + 2NaOH -> Na2CO3 + H2O")
+
+
+# --------------------------------------------------------------------------- #
+# 吸収塔サブフローシート（既存ユニットの組み合わせ・新 Unit は作らない）
+# --------------------------------------------------------------------------- #
+def caustic_scrubber(gas_in: dict[str, float], eta: float, *,
+                     excess: float = EXCESS, naoh_wt: float = NAOH_WT,
+                     T: float = 40.0, P: str = "5MPaG", name: str = "T-x"):
+    """苛性ソーダ吸収塔を Mixer + Reactor + Separator で組んで解く。
+
+    gas_in  : 塔に入るガスのモル流量 [mol/h]（主フローシートの解をそのまま渡す）
+    eta     : CO2 除去率（= Reactor の CO2 基準転化率そのもの）
+
+    自由度: 変数 3·n_g + 7 / 方程式 3·(n_g+2) + 1 で閉じる（n_g = ガス成分数）。
+    ガス側に残る水は「全量が液に落ちる」と近似した（51 bar・40 ℃ の飽和水分は
+    y_H2O ≈ 0.15% で、NaOH 収支にも下流にも効かない）。
+
+    戻り値 (problem, ScrubGas, Spent, Caustic)。
+    """
+    gas_comps = list(gas_in)
+    abs_comps = gas_comps + [f for f in ("NaOH", "Na2CO3") if f not in gas_comps]
+    liq_comps = ["H2O", "NaOH", "Na2CO3"]
+
+    gas_c = StreamCondition(T=T, P=P, phase="gas")
+    liq_c = StreamCondition(T=T, P=P, phase="liquid")
+
+    # 苛性ソーダ供給は「除去する CO2 の 2 倍 × 過剰率」。ガスが既知なので前もって決まる。
+    co2_removed = eta * gas_in.get("CO2", 0.0)
+    naoh = 2.0 * excess * co2_removed
+    # naoh_wt [wt%] の水溶液にするための水: m_w = m_NaOH·(1-wt)/wt
+    water = naoh * 40.0 * (1.0 - naoh_wt) / naoh_wt / 18.015
+
+    GasIn   = Stream(gas_comps, name="1. GasIn",   order=1, condition=gas_c, flows=gas_in)
+    Caustic = Stream(["NaOH", "H2O"], name="2. Caustic", order=2, condition=liq_c,
+                     flows={"NaOH": naoh, "H2O": water})
+    AbsIn   = Stream(abs_comps, name="3. AbsIn",  order=3, condition=gas_c)
+    AbsOut  = Stream(abs_comps, name="4. AbsOut", order=4, condition=gas_c)
+    ScrubGas = Stream(gas_comps, name="5. ScrubbedGas", order=5, condition=gas_c)
+    Spent    = Stream(liq_comps, name="6. SpentLiquor", order=6, condition=liq_c)
+
+    problem = Problem(
+        streams=[GasIn, Caustic, AbsIn, AbsOut, ScrubGas, Spent],
+        units=[Mixer([GasIn, Caustic], AbsIn, name=f"{name} 気液接触"),
+               Reactor(inlet=AbsIn, outlet=AbsOut, reactions=[CAUSTIC],
+                       key_component="CO2", conversion=eta, name=f"{name} 化学吸収"),
+               Separator(AbsOut, [ScrubGas, Spent], name=f"{name} 分液")],
+        name=f"{name} NaOH scrubber (eta={eta})")
+    problem.constrain_recovery(AbsOut, Spent, {"H2O": 1.0}, name="水は全量 液側へ")
+
+    sol = problem.solve()
+    if not sol.success:
+        raise RuntimeError(f"吸収塔が収束せず: {sol}")
+    return problem, ScrubGas, Spent, Caustic
+
+
+def report_caustic(label: str, gas_in: dict[str, float], eta: float, *, name: str):
+    """吸収塔を解いて薬剤収支を出し、xlsx と Mermaid を書き出す。"""
+    problem, ScrubGas, Spent, Caustic = caustic_scrubber(gas_in, eta, name=name)
+    co2_removed = eta * gas_in.get("CO2", 0.0)
+    naoh = Caustic.flow_of("NaOH")
+    print(f"\n--- {name} 苛性ソーダ吸収塔（{label}, η={eta:.0%}）---")
+    print(f"塔入口 CO2        : {gas_in.get('CO2', 0.0):.4f} mol/h")
+    print(f"除去 CO2          : {co2_removed:.4f} mol/h")
+    print(f"NaOH 供給         : {naoh:.4f} mol/h = {naoh * 40.0:.1f} g/h"
+          f"（量論の {EXCESS:.1f} 倍）")
+    print(f"苛性液 供給       : {Caustic.flow_of('H2O') * 18.015 + naoh * 40.0:.0f} g/h"
+          f"（{NAOH_WT:.0%} NaOH aq）")
+    print(f"Na2CO3 生成       : {Spent.flow_of('Na2CO3'):.4f} mol/h = "
+          f"{Spent.flow_of('Na2CO3') * 106.0:.1f} g/h")
+    print(f"未反応 NaOH       : {Spent.flow_of('NaOH'):.4f} mol/h（0 未満なら過剰率不足）")
+    print(f"廃液 計           : {float(Spent.total_flow.eval()):.4f} mol/h")
+    print(f"塔出口ガス CO2    : {ScrubGas.flow_of('CO2'):.4f} mol/h")
+    print(f"原子収支          : Reaction が生成時に検査済 "
+          f"({CAUSTIC.element_balance()})")
+
+    to_excel(problem.streams, os.path.join(OUT, f"co2removal_{label}_caustic.xlsx"),
+             sheet=f"{label}_caustic", basis=["mol", "mole_frac", "mass"])
+    export_mermaid(problem, os.path.join(OUT, f"co2removal_{label}_caustic.html"),
+                   title=f"{name} NaOH scrubber ({label}, eta={eta:.0%})", style="diamond")
+    return Spent
+
+
+# --------------------------------------------------------------------------- #
+# 3 ケース
+# --------------------------------------------------------------------------- #
+def run_case(tag: str, eta: float, purge: float, reform: dict, label: str) -> dict:
+    """1 ケース解いて、改質側 + plant3 側の指標を返す。
+
+    tag は "baseline" / "a_upstream" / "b_recycle"、label は出力ファイル名の接頭辞。
+    """
+    print(f"\n{'=' * 78}\n=== {label}（η={eta:.0%}, パージ率={purge:.0%}）\n{'=' * 78}")
+
+    # --- 前工程（改質器）。(a) のときだけ改質器側に T-100 を置く ---
+    ref_removal = eta if tag == "a_upstream" else None
+    rp, DryGas, CO2f, H2Of, PlantFeed = pp.solve_reformer(
+        verbose=False, co2_removal=ref_removal, **reform)
+    print(f"改質器: H2O={H2Of.flow_of('H2O'):.4f} CO2供給={CO2f.flow_of('CO2'):.4f} mol/h")
+    print(stream_table(rp.streams, basis=["mol", "mole_frac"]))
+    to_excel(rp.streams, os.path.join(OUT, f"co2removal_{label}_reformer.xlsx"),
+             sheet=f"{label}_reformer", basis=["mol", "mole_frac"])
+    export_mermaid(rp, os.path.join(OUT, f"co2removal_{label}_reformer.html"),
+                   title=f"Reformer + CO2 removal ({label})", style="diamond")
+
+    # (a) の吸収塔は改質器出口ガスを処理する
+    if tag == "a_upstream":
+        report_caustic(label, {f: DryGas.flow_of(f) for f in DryGas.formulas}, eta,
+                       name="T-100")
+
+    # --- 後工程（plant3）。(b) のときだけ plant3 の中に T-101 を置く ---
+    feed = {f: PlantFeed.flow_of(f) for f in PlantFeed.formulas}
+    plant_removal = eta if tag == "b_recycle" else None
+    problem, streams, v_tot = p3.solve_with_sv(feed=feed, co2_removal=plant_removal,
+                                               purge=purge)
+    by_name = {s.name: s for s in problem.streams}
+    Steam1, ReactorIn = by_name["1. Steam1"], by_name["2. ReactorIn"]
+    Purge, MA = by_name["7. Purge"], by_name["9. MethylAcetate"]
+    print(stream_table(problem.streams, basis=["mol", "mole_frac"]))
+    to_excel(problem.streams, os.path.join(OUT, f"co2removal_{label}_plant3.xlsx"),
+             sheet=f"{label}_plant3", basis=["mol", "mole_frac", "mass", "normal_volume"])
+    export_mermaid(problem, os.path.join(OUT, f"co2removal_{label}_plant3.html"),
+                   title=f"plant3 + CO2 removal ({label})", style="diamond")
+
+    # (b) の吸収塔は凝縮器出口ガスを処理する
+    if tag == "b_recycle":
+        cond_gas = by_name["5. CondGas"]
+        report_caustic(label, {f: cond_gas.flow_of(f) for f in cond_gas.formulas}, eta,
+                       name="T-101")
+
+    n_in = float(ReactorIn.total_flow.eval())
+    # 抜いた CO2 は (a) なら改質器側の、(b) なら plant3 側のベントに出る
+    ref_vent = next((s for s in rp.streams if s.name == "9. CO2Vent"), None)
+    up_removed = ref_vent.flow_of("CO2") if ref_vent is not None else 0.0
+    loop_removed = (by_name["14. CO2Vent"].flow_of("CO2")
+                    if "14. CO2Vent" in by_name else 0.0)
+    removed = up_removed + loop_removed
+    return {
+        "供給 CO2 [mol/h]": Steam1.flow_of("CO2"),
+        "除去 CO2 [mol/h]": removed,
+        "反応器入口 [mol/h]": n_in,
+        "反応器入口 CO2 [mol%]": ReactorIn.flow_of("CO2") / n_in * 100,
+        "反応器入口 CO  [mol%]": ReactorIn.flow_of("CO") / n_in * 100,
+        "反応器入口 CH4 [mol%]": ReactorIn.flow_of("CH4") / n_in * 100,
+        "全触媒体積 [mL]": v_tot * 1e6,
+        "酢酸メチル [mol/h]": MA.flow_of("CH3COOCH3"),
+        "CO パージ損失 [mol/h]": Purge.flow_of("CO"),
+        "CO2 パージ [mol/h]": Purge.flow_of("CO2"),
+        "新鮮CO基準 炭素収率 [%]": MA.flow_of("CH3COOCH3") * 3 / Steam1.flow_of("CO") * 100,
+        # plant3 ループの CO2 収支（出 − 入）。正 = ループ内で CO が CO2 に食われている量
+        # （順方向 WGS の正味進行度）。(a) の前段除去は plant3 の外なので入れない。
+        "CO2 正味生成 [mol/h]": (Purge.flow_of("CO2") + loop_removed
+                                 - Steam1.flow_of("CO2")),
+    }
+
+
+def main():
+    ap = argparse.ArgumentParser(description="CO2 除去位置 (a)/(b) の比較")
+    ap.add_argument("--eta", default="0.90",
+                    help="CO2 除去率。カンマ区切りで複数指定すると η スイープになる"
+                         "（例 --eta 0.5,0.9,0.99）")
+    ap.add_argument("--cases", default="baseline,a_upstream,b_recycle",
+                    help="実行するケースをカンマ区切りで（baseline/a_upstream/b_recycle）")
+    ap.add_argument("--reform", default="A_base",
+                    help=f"土台にする改質条件（{'/'.join(pp.CASES)}）")
+    ap.add_argument("--purge", type=float, default=p3.PURGE,
+                    help=f"パージ率（既定 {p3.PURGE}）")
+    args = ap.parse_args()
+
+    if args.reform not in pp.CASES:
+        ap.error(f"--reform は {list(pp.CASES)} のいずれか")
+    reform = dict(pp.CASES[args.reform])
+    etas = [float(e) for e in args.eta.split(",") if e.strip()]
+
+    os.makedirs(OUT, exist_ok=True)
+    tags = [t.strip() for t in args.cases.split(",") if t.strip()]
+
+    # baseline は η に依らないので 1 回だけ。(a)/(b) は η ごとに回す。
+    plan: list[tuple[str, float, str]] = []
+    for tag in tags:
+        if tag == "baseline":
+            plan.append((tag, 0.0, f"{args.reform}_baseline"))
+        else:
+            for eta in etas:
+                plan.append((tag, eta, f"{args.reform}_{tag}_eta{eta:g}"))
+
+    print(f"実行計画: {len(plan)} runs（plant3 は 1 run 約 10 分 → 約 "
+          f"{len(plan) * 10} 分）")
+    for _tag, eta, label in plan:
+        print(f"  - {label}  η={eta:.0%}")
+
+    # 総当たりは数時間走るので、1 ケースが収束しなくても残りを続ける。
+    # 落ちたケースは results に入れず、最後にまとめて報告する。
+    results, failed = {}, []
+    for i, (tag, eta, label) in enumerate(plan, 1):
+        t0 = time.time()
+        try:
+            results[label] = run_case(tag, eta, args.purge, reform, label)
+            print(f"[{i}/{len(plan)}] {label} 完了 ({time.time() - t0:.0f}s)")
+        except Exception as e:                      # noqa: BLE001 — 打ち切らず続行
+            failed.append((label, f"{type(e).__name__}: {e}"))
+            print(f"[{i}/{len(plan)}] {label} 失敗 ({time.time() - t0:.0f}s): "
+                  f"{type(e).__name__}: {e}")
+
+    if len(results) > 1:
+        print(f"\n{'=' * 78}\n=== 除去位置の比較（改質条件 {args.reform} 固定・"
+              f"パージ率 {args.purge:.0%}）\n{'=' * 78}")
+        metrics = list(next(iter(results.values())))
+        # 列見出しは改質条件名（全列共通）を落として短くする
+        heads = {t: t[len(args.reform) + 1:] or "baseline" for t in results}
+        print(f"{'指標':>24s}" + "".join(f"{heads[t]:>18s}" for t in results))
+        for m in metrics:
+            print(f"{m:>24s}" + "".join(f"{results[t][m]:18.4f}" for t in results))
+        print("\n読み方: 「CO2 正味生成」が baseline より増えていれば、CO2 を抜いたぶん\n"
+              "順方向 WGS が進んで CO が食われている。それが MA の減少と 1:3 で対応する\n"
+              "なら、docstring 冒頭の予測どおり。対応しないなら別の機構を探す必要がある。")
+
+    if failed:
+        print(f"\n⚠ 収束しなかったケース {len(failed)} 件:")
+        for label, msg in failed:
+            print(f"  - {label}: {msg}")
+
+
+if __name__ == "__main__":
+    main()

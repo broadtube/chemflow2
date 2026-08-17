@@ -63,6 +63,7 @@ from chemflow2 import (
     Stream,
     StreamCondition,
     stream_table,
+    to_excel,
 )
 
 # --- 改質器の固定条件 ---
@@ -123,8 +124,19 @@ STEAM1_REFERENCE = {"H2": 4.911989, "CO": 3.549828, "CO2": 1.675074,
 
 
 def solve_reformer(*, T, P, h2o=None, h2_co=H2_CO_TARGET, carbon_limit=None,
-                   ch4_conversion=None, verbose=True):
+                   ch4_conversion=None, co2_removal=None, verbose=True):
     """H2/CO を指定して CO2 供給量を逆算する形で pattern1 を解き、DryGas を返す。
+
+    co2_removal に除去率 η を渡すと、**改質器の下流・plant3 へ渡す手前**に CO2 除去塔を
+    置く（= 除去位置 (a)）。CO2 は改質器の中では CO 源として働かせたうえで、下流の循環系
+    には持ち込まない、という狙い。改質器への CO2 供給を絞る C/D ケースと違い、
+    ドライリフォーミングの取り分は捨てない。
+
+        DryGas ─[T-100]─→ PlantFeed（plant3 へ）
+                  └────→ CO2Vent
+
+    戻り値は (problem, DryGas, CO2f, H2Of, PlantFeed)。除去塔が無いときは
+    PlantFeed is DryGas。
 
     h2o を数値で渡すと水蒸気供給を固定する。自由度 20/20:
         変数   CO2_feed 1 + Mixed 4 + ReactOut 5 + DryGas 5 + Condensate 5
@@ -155,13 +167,27 @@ def solve_reformer(*, T, P, h2o=None, h2_co=H2_CO_TARGET, carbon_limit=None,
                         guess=SEED_OUTLET)
     Condensate = Stream(SPECIES, name="7. Condensate", order=7, condition=cold_l)
 
+    # --- CO2 除去塔（オプション・除去位置 (a)）---
+    scrub_streams: list[Stream] = []
+    scrub_units: list = []
+    PlantFeed = DryGas
+    if co2_removal is not None:
+        PlantFeed = Stream(SPECIES, name="8. PlantFeed", order=8, condition=cold_g,
+                           guess=SEED_OUTLET)
+        CO2Vent   = Stream(["CO2"], name="9. CO2Vent", order=9, condition=cold_g)
+        scrub_streams = [PlantFeed, CO2Vent]
+        scrub_units = [Separator(DryGas, [PlantFeed, CO2Vent], name="T-100 CO2除去塔")]
+
     problem = Problem(
-        streams=[RG, CO2f, H2Of, Mixed, ReactOut, DryGas, Condensate],
+        streams=[RG, CO2f, H2Of, Mixed, ReactOut, DryGas, Condensate] + scrub_streams,
         units=[Mixer([RG, CO2f, H2Of], Mixed, name="M0"),
                GibbsReactor(inlet=Mixed, outlet=ReactOut, species=SPECIES,
                             T=T, P=P, name="G1"),
-               Separator(ReactOut, [DryGas, Condensate], name="Condenser")],
+               Separator(ReactOut, [DryGas, Condensate], name="Condenser")] + scrub_units,
         name=f"Reformer {T:.0f}C {P} H2O={h2o}")
+    if co2_removal is not None:
+        problem.constrain_recovery(DryGas, scrub_streams[1], {"CO2": float(co2_removal)},
+                                   name=f"CO2除去率={co2_removal}")
     problem.constrain_saturation(DryGas, "H2O", T=T_COND, P=P)
     problem.constrain_henry(DryGas, Condensate, DISSOLVED, T=T_COND, P=P)
     # 生成ガスの H2/CO を指定（残り 1 本）
@@ -189,7 +215,7 @@ def solve_reformer(*, T, P, h2o=None, h2_co=H2_CO_TARGET, carbon_limit=None,
     if verbose:
         print(f"  改質器: T={T:.0f}℃ P={P} H2O={H2Of.flow_of('H2O'):.4f} → "
               f"CO2供給 {CO2f.flow_of('CO2'):.4f} mol/h  (自由度 {problem.degrees_of_freedom()})")
-    return problem, DryGas, CO2f, H2Of
+    return problem, DryGas, CO2f, H2Of, PlantFeed
 
 
 def drygas_summary(DryGas) -> dict:
@@ -220,7 +246,7 @@ def main():
           f"{'CH4転化':>8s} {'a_C':>7s}")
     feeds, summaries = {}, {}
     for tag, cond in CASES.items():
-        problem, DryGas, CO2f, H2Of = solve_reformer(verbose=False, **cond)
+        problem, DryGas, CO2f, H2Of, _ = solve_reformer(verbose=False, **cond)
         react_out = next(s for s in problem.streams if s.name == "5. ReactOut")
         s = drygas_summary(DryGas)
         conv = (RG_FEED["CH4"] - react_out.flow_of("CH4")) / RG_FEED["CH4"]
@@ -243,8 +269,8 @@ def main():
     print(f"{'T[℃]':>6s}{'H2O[mol/h]':>11s}{'H2O/CH4':>9s}{'CO2供給':>9s}"
           f"{'不活性計':>9s}{'a_C':>9s}")
     for T in (850.0, 900.0):
-        pr, dry, co2f, h2of = solve_reformer(T=T, P="1.04MPaG", carbon_limit=1.0,
-                                             verbose=False)
+        pr, dry, co2f, h2of, _ = solve_reformer(T=T, P="1.04MPaG", carbon_limit=1.0,
+                                                verbose=False)
         react_out = next(s for s in pr.streams if s.name == "5. ReactOut")
         s = drygas_summary(dry)
         h2o = h2of.flow_of("H2O")
@@ -278,9 +304,10 @@ def main():
 
         out = os.path.join(os.path.dirname(__file__), "output")
         os.makedirs(out, exist_ok=True)
-        from chemflow2 import to_csv
-        to_csv(problem.streams, os.path.join(out, f"plant3_{tag}_streams.csv"),
-               basis=["mol", "mole_frac"])
+        xlsx = os.path.join(out, f"plant3_{tag}_streams.xlsx")
+        to_excel(problem.streams, xlsx, sheet=tag,
+                 basis=["mol", "mole_frac", "mass", "normal_volume"])
+        print(f"Excel 出力: {xlsx}")
 
     # --- まとめ ---
     if len(results) > 1:

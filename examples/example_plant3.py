@@ -64,7 +64,9 @@ liq = StreamCondition(T=40, P="5MPaG", phase="liquid")
 
 NAMES = ["1. Steam1", "2. ReactorIn", "3. HybridOut", "4. ReactorOut", "5. CondGas",
          "6. CondLiq", "7. Purge", "8. RecycleGas", "9. MethylAcetate", "10. Sep1Liq",
-         "11. RecycleMeOH", "12. Water"]
+         "11. RecycleMeOH", "12. Water",
+         # 以下は co2_removal を指定したときだけ現れる（既定の 12 本には影響しない）
+         "13. ScrubbedGas", "14. CO2Vent"]
 
 
 def catalyst_masses(v_tot: float) -> tuple[float, float, float]:
@@ -80,11 +82,26 @@ def volume_for(n_molh: float) -> float:
 
 
 def build(v_tot: float, seed: dict[str, np.ndarray] | None = None,
-          feed: dict[str, float] | None = None):
+          feed: dict[str, float] | None = None,
+          co2_removal: float | None = None, purge: float = PURGE):
     """全触媒体積 v_tot [m³] のフローシートを組む。
 
     seed は前回解（初期推定）。feed を渡すと新鮮供給の組成を差し替えられる
     （前工程 pattern1 の DryGas をそのまま流し込むため。既定は STEAM1）。
+
+    co2_removal に除去率 η（0〜1）を渡すと、**凝縮器出口ガスとパージ分岐の間**に
+    CO2 除去塔を 1 段挿す（= 除去位置 (b)）。パージより手前に置くのは、CO2 を先に
+    抜けばパージすべき不活性が CH4 だけになり、パージ率を下げる余地が生まれるため。
+
+        CondGas ─[T-101]─→ ScrubbedGas ─[SP-gas]─→ Purge / RecycleGas
+                    └────→ CO2Vent
+
+    塔はガス側に対しては「CO2 だけを η の割合で抜く分離器」でしかないので、
+    Separator 1 個 + 回収率制約 1 本で表す（自由度は +12 変数 / +12 式で閉じる）。
+    苛性ソーダの量論（NaOH 消費・Na2CO3 廃液）は循環系に影響しないため、
+    ここには入れず example_co2_removal.caustic_scrubber() で別に解く。
+
+    purge でパージ率を上書きできる（既定は PURGE=5%）。
     """
 
     def S(i: int, cond: StreamCondition = gas) -> Stream:
@@ -108,6 +125,20 @@ def build(v_tot: float, seed: dict[str, np.ndarray] | None = None,
 
     m_syn, m_deh, m_ma = catalyst_masses(v_tot)
 
+    # --- CO2 除去塔（オプション・除去位置 (b)）---
+    # 塔を入れるとパージ分岐の入口が CondGas → ScrubbedGas に差し替わる。
+    scrub_streams: list[Stream] = []
+    scrub_units: list = []
+    if co2_removal is not None:
+        ScrubbedGas = S(13)
+        CO2Vent     = Stream(["CO2"], name=NAMES[13], order=14, condition=gas,
+                             guess=seed.get(NAMES[13]) if seed else None)
+        scrub_streams = [ScrubbedGas, CO2Vent]
+        scrub_units = [Separator(CondGas, [ScrubbedGas, CO2Vent], name="T-101 CO2除去塔")]
+        split_feed = ScrubbedGas
+    else:
+        split_feed = CondGas
+
     M1   = Mixer([Steam1, RecycleGas, RecycleMeOH], ReactorIn, name="M1")
     R1   = KineticReactor(inlet=ReactorIn, outlet=HybridOut,
                           masses={"synthesis": m_syn, "dehydration": m_deh},
@@ -118,14 +149,21 @@ def build(v_tot: float, seed: dict[str, np.ndarray] | None = None,
                           models={"carbonylation": "DTU-Cheung2007-2"},
                           n_points=2, name="R2 MA bed")
     Cond = Separator(ReactorOut, [CondGas, CondLiq], name="Condenser")
-    SPg  = Splitter(CondGas, [Purge, RecycleGas], ratios=[PURGE, 1 - PURGE], name="SP-gas")
+    SPg  = Splitter(split_feed, [Purge, RecycleGas], ratios=[purge, 1 - purge], name="SP-gas")
     Col1 = Separator(CondLiq, [MA_Product, Sep1Liq], name="Column1")
     Col2 = Separator(Sep1Liq, [RecycleMeOH, Water_Out], name="Column2")
 
     streams = [Steam1, ReactorIn, HybridOut, ReactorOut, CondGas, CondLiq, Purge,
-               RecycleGas, MA_Product, Sep1Liq, RecycleMeOH, Water_Out]
-    problem = Problem(streams=streams, units=[M1, R1, R2, Cond, SPg, Col1, Col2],
+               RecycleGas, MA_Product, Sep1Liq, RecycleMeOH, Water_Out] + scrub_streams
+    problem = Problem(streams=streams, units=[M1, R1, R2, Cond] + scrub_units +
+                      [SPg, Col1, Col2],
                       name="Syngas plant (kinetic tandem reactor)")
+
+    # 除去塔の指定: CO2 のみ η の割合で CO2Vent へ。CO2Vent は 1 成分ストリームなので
+    # 「他成分は回収率 0」を書く必要がない（書くと変数の無い式が増えて自由度が崩れる）。
+    if co2_removal is not None:
+        problem.constrain_recovery(CondGas, scrub_streams[1], {"CO2": float(co2_removal)},
+                                   name=f"CO2除去率={co2_removal}")
 
     # --- 分離指定（各分離器の液側への回収率）---
     # 凝縮器: 軽質ガス（H2/CO/CO2/CH4/N2/DME）は気相、含酸素の重質分は液相へ。
@@ -152,20 +190,23 @@ RECYCLE_GUESS = 6.5
 
 
 def solve_with_sv(max_outer: int = 8, tol: float = 1e-4, verbose: bool = True,
-                  feed: dict[str, float] | None = None):
+                  feed: dict[str, float] | None = None,
+                  co2_removal: float | None = None, purge: float = PURGE):
     """SV 一定（反応器入口基準）になるまで触媒体積 V を外側反復して解く。
 
     g(V) = volume_for(反応器入口流量(V)) − V の零点を**割線法**で探す。
     単純な減衰付き固定点反復だと 1 回の求解が数分かかるのに 6〜8 回必要になるため。
     各求解は前回解をそのまま初期推定に使う（ウォームスタート）。
     feed で新鮮供給の組成を差し替えられる（既定は STEAM1）。
+    co2_removal / purge は build() にそのまま渡す（除去位置 (b) 用）。
     """
     feed = feed if feed is not None else STEAM1
     state: dict[str, object] = {}
 
     def g(v: float, it: int) -> float:
         t0 = time.time()
-        problem, streams = build(v, state.get("seed"), feed=feed)
+        problem, streams = build(v, state.get("seed"), feed=feed,
+                                 co2_removal=co2_removal, purge=purge)
         if it == 1 and verbose:
             print("自由度 (変数, 方程式):", problem.degrees_of_freedom())
         sol = problem.solve(bounds=(0, np.inf), tol=1e-6,
