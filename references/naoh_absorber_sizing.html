@@ -157,6 +157,7 @@
     <a href="#liquid">液側</a>
     <a href="#impl">実装との接続</a>
     <a href="#limits">前提と限界</a>
+    <a href="#verdict">作る価値があるか</a>
   </div>
 </nav>
 
@@ -164,7 +165,7 @@
   <header class="hero">
     <p class="eyebrow">NaOH scrubber · packed column sizing</p>
     <h1>苛性ソーダ吸収塔の寸法 — chemflow2 の外で決まる部分</h1>
-    <p class="lede">chemflow2 のフローシートには <b>CO₂ 除去率 η</b> しか現れない。塔の高さ・径・充填量はそこには入らないが、実験装置を組むには必要になる。ここでは <b>η → 塔の寸法</b> を結ぶ最小限の計算をまとめる。結論から言うと、<b>本件の規模では物質移動に必要な充填体積は数十 mL のオーダー</b>で、塔の寸法を実際に決めるのは物質移動ではなく<b>濡れ性・液分散・耐圧</b>といった実務制約のほうである。</p>
+    <p class="lede">chemflow2 のフローシートには <b>CO₂ 除去率 η</b> しか現れない。塔の高さ・径・充填量はそこには入らないが、実験装置を組むには必要になる。ここでは <b>η → 塔の寸法</b> を結ぶ最小限の計算をまとめる。結論から言うと、<b>本件の規模では物質移動に必要な充填体積は約 20 mL</b>で、塔の寸法を実際に決めるのは物質移動ではなく<b>濡れ性・液分散・耐圧</b>といった実務制約のほうである。<br><br>⚠ ただし<b>プロセスとしては CO₂ を抜かないほうがよい</b>という結論が総当たり計算（26 runs）から出ている（§9）。本文書は「作るならこう設計する」であって、作るべきだと言っているのではない。</p>
 
     <div class="legend" aria-label="記号の凡例">
       <dl><dt>η</dt><dd>CO₂ 除去率 [−]（chemflow2 に渡す唯一の量）</dd></dl>
@@ -275,7 +276,7 @@
       <h2>4 &nbsp;T-100（前段）と T-101（循環）の比較</h2>
       <span class="tag">A_base · η = 0.9</span>
     </div>
-    <p class="cite">数値の出どころ: <code>examples/output/plant3_A_base_streams.xlsx</code>（除去なしの収束解）と <code>examples/example_pattern1_plant3.py</code> の A_base 改質条件。</p>
+    <p class="cite">数値の出どころ: <code>examples/output/co2removal_A_base_{a_upstream,b_recycle}_eta0.9_plant3.xlsx</code>（いずれも塔を入れた収束解）。T-101 の値は<b>塔を入れて解き直した定常値</b>であり、除去なしの値ではない。</p>
 
     <div class="tbl-scroll">
       <table>
@@ -284,25 +285,27 @@
         <tbody>
           <tr><td>処理するガス</td><td>DryGas</td><td>CondGas</td><td class="rolecol">—</td></tr>
           <tr><td>全圧 [MPa abs]</td><td>1.141</td><td>5.101</td><td class="rolecol">1.04 / 5 MPaG</td></tr>
-          <tr><td>ガス流量 [mol/h]</td><td>10.41</td><td>60.36</td><td class="rolecol">T-101 は除去なしの値</td></tr>
-          <tr><td>CO₂ [mol%]</td><td>16.09</td><td>58.56</td><td class="rolecol">同上</td></tr>
-          <tr><td>CO₂ [mol/h]</td><td>1.675</td><td>35.35</td><td class="rolecol">同上</td></tr>
-          <tr><td>V<sub>充填</sub> [mL] 目安</td><td class="match">21</td><td class="diff">27</td><td class="rolecol">V = NTU·G/(k<sub>G</sub>a·P)</td></tr>
+          <tr><td>ガス流量 [mol/h]</td><td>10.41</td><td>41.23</td><td class="rolecol">4.0 倍</td></tr>
+          <tr><td>CO₂ [mol%]</td><td>16.09</td><td>5.96</td><td class="rolecol">—</td></tr>
+          <tr><td>CO₂ [mol/h]</td><td>1.675</td><td>2.457</td><td class="rolecol">—</td></tr>
+          <tr><td>p<sub>CO₂</sub> [atm]</td><td>1.81</td><td>3.00</td><td class="rolecol">§5 で使う</td></tr>
+          <tr><td>V<sub>充填</sub> [mL] 目安</td><td class="match">21</td><td class="match">19</td><td class="rolecol">V = NTU·G/(k<sub>G</sub>a·P)</td></tr>
         </tbody>
       </table>
     </div>
 
-    <div class="note">
-      <p class="h">⚠ T-101 の入口は「除去なし」の値であって、塔を入れた収束解ではない</p>
-      <p>循環系に塔を入れると<b>ループ内 CO₂ 濃度は激減する</b>。定常では系から出る CO₂ = 供給 CO₂ + ループ内の正味生成 で釣り合うので、除去率 η を上げてもベントに出る量は増えない — 変わるのは<b>ループ内の濃度</b>だけ。上表の 35.35 mol/h は η = 0 の極限であり、η = 0.9 の収束解ではガス量・CO₂ 濃度とも大きく下がる。<b>確定値は現在流している総当たり計算の <code>co2removal_A_base_b_recycle_eta0.9_plant3.xlsx</code> から取り直すこと。</b></p>
+    <div class="note acc">
+      <p class="h">ループ CO₂ は塔を入れた瞬間に激減する — だから T-101 は小さくて済む</p>
+      <p>除去なしの CondGas は CO₂ を <b>35.35 mol/h（58.6 mol%）</b>含むが、塔を入れて解き直すと <b>2.46 mol/h（5.96 mol%）</b>まで落ちる。定常では系から出る CO₂ = 供給 CO₂ + ループ内の正味生成 で釣り合うので、<b>除去率 η を上げてもベントに出る量は増えない</b> — 変わるのはループ内の濃度だけ。実際 η = 0.9 と η = 0.99 で除去量は 2.211 → 2.232 mol/h とほぼ動かない。</p>
+      <p><b>設計上の含意</b>: 塔の大きさも薬剤消費も、除去なしの濃い CO₂ で見積もってはいけない。<b>塔を入れた収束解で見積もること</b>。除去なしの値で設計すると 14 倍過大になる。</p>
     </div>
 
     <div class="note acc">
       <p class="h">高圧が流量の不利を打ち消す</p>
-      <p>T-101 はガスを 6 倍近く処理するのに、必要な充填体積は T-100 と同オーダーに収まる。\(V \propto G/P\) で、5 倍の圧力が 6 倍の流量をほぼ相殺するため。<b>物質移動の観点では (b) が不利ということはない。</b>不利なのは装置側 — 5 MPa の苛性スクラバーは相応の圧力容器になる（§7）。</p>
+      <p>T-101 はガスを 4 倍処理するのに、必要な充填体積は T-100 とほぼ同じ（19 mL 対 21 mL）。\(V \propto G/P\) で、4.5 倍の圧力が 4 倍の流量を相殺するため。<b>物質移動の観点では (b) が不利ということはない。</b>不利なのは装置側 — 5 MPa の苛性スクラバーは相応の圧力容器になる（§7）。</p>
     </div>
 
-    <p>どちらも <b>数十 mL</b> のオーダーで、25 mm 径 × 0.5 m の実験塔（充填体積 ≈ 245 mL）なら 10 倍の余裕がある。k<sub>G</sub>a を 10 分の 1 に見積もっても 210 / 270 mL で収まる。<b>本件の規模では、塔高を決めるのは物質移動ではない。</b></p>
+    <p>どちらも <b>約 20 mL</b> で、25 mm 径 × 0.5 m の実験塔（充填体積 ≈ 245 mL）なら 12 倍の余裕がある。k<sub>G</sub>a を 10 分の 1 に見積もっても 190 / 210 mL で収まる。<b>本件の規模では、塔高を決めるのは物質移動ではない。</b></p>
   </section>
 
   <!-- ============ 律速域 ============ -->
@@ -333,7 +336,7 @@
         <thead><tr><th>条件</th><th>p<sub>CO₂</sub> [atm]</th><th>E<sub>∞</sub> 概算</th><th>Ha ≈ 90 との比較</th><th class="rolecol">領域</th></tr></thead>
         <tbody>
           <tr><td>T-100 (a)</td><td>1.8</td><td class="match">~650</td><td>Ha ≪ E<sub>∞</sub></td><td class="rolecol">高速反応・気膜律速でよい</td></tr>
-          <tr><td>T-101 (b) 収束後</td><td>~3.5</td><td class="match">~330</td><td>Ha ≪ E<sub>∞</sub></td><td class="rolecol">同上</td></tr>
+          <tr><td>T-101 (b) 収束解</td><td>3.0</td><td class="match">~380</td><td>Ha ≪ E<sub>∞</sub></td><td class="rolecol">同上</td></tr>
           <tr><td>T-101 (b) 除去なしの極限</td><td>29</td><td class="diff">~40</td><td>Ha &gt; E<sub>∞</sub></td><td class="diff">瞬間反応・液膜も効く</td></tr>
         </tbody>
       </table>
@@ -341,7 +344,7 @@
 
     <div class="note">
       <p class="h">⚠ 高 CO₂ 分圧では前提が崩れる</p>
-      <p>CO₂ 分圧が高いほど界面の \(C^{*}_{\mathrm{CO_2}}\) が上がり、OH⁻ の供給が相対的に足りなくなって \(E_\infty\) が下がる。<b>そこまで行くと液膜抵抗が無視できず、§3 の塔高式は過小評価になる</b>（液流量を増やすか NaOH 濃度を上げる必要がある）。ただし<b>定常運転ではループ CO₂ は下がるので、この領域には入らない見込み</b>。起動時など CO₂ が濃い状態を通る場合だけ注意すればよい。</p>
+      <p>CO₂ 分圧が高いほど界面の \(C^{*}_{\mathrm{CO_2}}\) が上がり、OH⁻ の供給が相対的に足りなくなって \(E_\infty\) が下がる。<b>そこまで行くと液膜抵抗が無視できず、§3 の塔高式は過小評価になる</b>（液流量を増やすか NaOH 濃度を上げる必要がある）。<b>収束解ではループ CO₂ が 5.96 mol% まで落ちるのでこの領域には入らない</b>ことが確認できた（§4）。注意が要るのは<b>起動時</b> — 塔を入れる前のループには CO₂ が 58.6 mol% 溜まっており、そこから抜き始める過渡では瞬間反応領域を通る。</p>
       <p>なお \(C^{*}_{\mathrm{CO_2}}\) は 5 M NaOH 中の塩析（Sechenov 効果）で純水の 1/4 程度に下がるとして見積もった。上表は<b>桁の判断に使う値であって設計値ではない</b>。</p>
     </div>
   </section>
@@ -372,6 +375,12 @@
           <tr><td>8 時間運転あたり</td><td>NaOH 1.16 kg / 廃液 5.8 kg</td><td class="rolecol">実験室で扱える規模</td></tr>
         </tbody>
       </table>
+    </div>
+
+    <div class="note acc">
+      <p class="h">薬剤消費は η にほとんど依らない</p>
+      <p>定常では「抜くべき CO₂ = 供給 CO₂ + ループ内の正味生成」で決まり、η はループ内の濃度を変えるだけ。実際 T-101 の収束解で <b>η = 0.9 → NaOH 5.307 mol/h（212 g/h）、η = 0.99 → 5.356 mol/h（214 g/h）</b>と 1% しか動かない。<b>η を高く取っても薬剤コストは増えない</b>ので、除去率は塔の都合だけで決めてよい。</p>
+      <p>T-101 のほうが T-100 より薬剤を食う（212 g/h 対 145 g/h）のは、循環系の中では順方向 WGS が CO₂ を作り続けるぶん、抜くべき量が供給 CO₂ を上回るため。</p>
     </div>
 
     <div class="note">
@@ -427,12 +436,74 @@
       <li><span class="n">2</span><span class="eq">k₂・D・k<sub>L</sub>・C* も代表値。Ha と E<sub>∞</sub> は桁の判断用</span><span class="lbl">§5</span></li>
       <li><span class="n">3</span><span class="eq">等温・軸方向分散なし・液は完全混合しないものとした</span><span class="lbl">全体</span></li>
       <li><span class="n">4</span><span class="eq">吸収熱による温度上昇を見ていない</span><span class="lbl">§5</span></li>
-      <li><span class="n">5</span><span class="eq">T-101 の入口組成は η = 0 の値。収束解で取り直すこと</span><span class="lbl">§4</span></li>
+      <li><span class="n">5</span><span class="eq">塔の外側の結論（CO₂ を抜くと MA が減る）は本文書の範囲外</span><span class="lbl">§9</span></li>
     </ul>
 
     <p>1〜2 のため、<b>本文書の充填体積は「数十 mL のオーダー」以上の精度を主張しない</b>。ただし §4 で見たとおり k<sub>G</sub>a を 10 分の 1 に見積もっても実験塔の容量に対して十分小さいので、<b>「物質移動は律速にならない」という結論自体は桁の誤差に対して頑健</b>である。</p>
 
     <p>4 の吸収熱は、CO₂ + 2NaOH の反応熱がかなり大きい（おおむね −100 kJ/mol-CO₂ 台）ため本来は無視できないが、本件は<b>除去量が 1.5 mol/h と小さく液を循環させる</b>ので、循環液の熱容量で吸収できる範囲に収まる見込み。規模を上げるときは再検討が要る。</p>
+  </section>
+
+  <!-- ============ そもそも作る価値があるか ============ -->
+  <section id="verdict">
+    <div class="sec-head">
+      <h2>9 &nbsp;⚠ そもそもこの塔を作る価値があるか — 総当たり計算の結論</h2>
+      <span class="tag">26 runs</span>
+    </div>
+    <p class="cite">出どころ: 改質条件 4 種 × 除去位置 2 種 × η = 0.5/0.9/0.99 の総当たり（28 runs 中 26 成功）。<code>examples/example_co2_removal.py</code>。</p>
+
+    <div class="note">
+      <p class="h">⚠ CO₂ 除去は 26 runs すべてで酢酸メチルを減らした。例外なし。</p>
+      <p>塔の寸法の話とは別に、<b>プロセスとしては CO₂ を抜かないほうがよい</b>という結論が出ている。本文書は「作るならこう設計する」を書いたものであって、<b>作るべきだと言っているのではない</b>。</p>
+    </div>
+
+    <div class="tbl-scroll">
+      <table>
+        <caption>A_base 改質条件での酢酸メチル生成 [mol/h]（他 3 条件も同じ向き）</caption>
+        <thead><tr><th>条件</th><th>MA [mol/h]</th><th>炭素収率 [%]</th><th>全触媒 [mL]</th><th class="rolecol">—</th></tr></thead>
+        <tbody>
+          <tr><td>除去なし</td><td class="match">1.0416</td><td class="match">88.03</td><td>305.1</td><td class="rolecol">最良</td></tr>
+          <tr><td>(a) 前段 η = 0.5</td><td>1.0103</td><td>85.38</td><td>242.7</td><td class="rolecol">−3.0 %</td></tr>
+          <tr><td>(a) 前段 η = 0.99</td><td>0.9102</td><td>76.92</td><td>206.8</td><td class="rolecol">−12.6 %</td></tr>
+          <tr><td>(b) 循環 η = 0.5</td><td class="diff">0.8572</td><td>72.44</td><td>207.6</td><td class="rolecol">−17.7 %</td></tr>
+          <tr><td>(b) 循環 η = 0.9</td><td class="diff">0.8525</td><td>72.04</td><td>214.3</td><td class="rolecol">−18.2 %</td></tr>
+          <tr><td>(b) 循環 η = 0.99</td><td class="diff">0.8553</td><td>72.28</td><td>215.9</td><td class="rolecol">−17.9 %</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p>C_03MPaG・D_01MPaG では (b) は<b>触媒量まで増える</b>（213 → 268 mL、217 → 286 mL）ので、MA と触媒の両方で悪化する。トレードオフですらない。</p>
+
+    <div class="subhead">炭素収支で見た機構</div>
+    <p>新鮮 CO の行き先を数えると、A_base の除去なしと (b) η = 0.9 の差が完全に説明できる（単位 mol-CO/h、供給 CO は両者とも 3.5498）:</p>
+
+    <div class="tbl-scroll">
+      <table>
+        <caption>新鮮 CO の行き先（合計は供給 CO に一致する）</caption>
+        <thead><tr><th>行き先</th><th>除去なし</th><th>(b) η = 0.9</th><th>差</th><th class="rolecol">—</th></tr></thead>
+        <tbody>
+          <tr><td>酢酸メチル（3 CO/MA）</td><td>3.1248</td><td>2.5575</td><td class="diff">−0.5673</td><td class="rolecol">目的生成物</td></tr>
+          <tr><td>順方向 WGS で CO₂ へ</td><td>0.0922</td><td>0.5484</td><td class="diff">+0.4562</td><td class="rolecol">損失 80 %</td></tr>
+          <tr><td>DME としてパージ（2 CO/DME）</td><td>0.0652</td><td>0.3196</td><td class="diff">+0.2544</td><td class="rolecol">損失 45 %</td></tr>
+          <tr><td>CO のままパージ</td><td>0.2675</td><td>0.1245</td><td class="match">−0.1430</td><td class="rolecol">戻り 25 %</td></tr>
+          <tr><td><b>合計</b></td><td><b>3.5497</b></td><td><b>3.5500</b></td><td>—</td><td class="rolecol">供給 3.5498</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p>機構は 2 つあった:</p>
+    <ul class="rxns">
+      <li><span class="n">主</span><span class="eq">ループ CO₂ を抜くと順方向 WGS（CO + H₂O → CO₂ + H₂）が加速し CO が食われる</span><span class="lbl">80 %</span></li>
+      <li><span class="n">副</span><span class="eq">DME が循環系に 5 倍溜まり（0.62 → 3.04 mol/h）パージで抜ける</span><span class="lbl">45 %</span></li>
+      <li><span class="n">戻り</span><span class="eq">CO パージ損失は減る（0.268 → 0.125）</span><span class="lbl">−25 %</span></li>
+    </ul>
+
+    <p><b>ループ内の CO₂ は WGS の生成物側阻害として CO を守っていた</b> — 事前の予測どおりだった。当初の「CO₂ は RWGS を通じて CO を供給する」という説明は誤りで、CO₂ は全ケースで正味<b>生成</b>側である。</p>
+
+    <div class="note acc">
+      <p class="h">それでも実験する意味があるとすれば</p>
+      <p>上は速度論モデル（KOGAS / ZSM-5 / DTU-Cheung2007-2）と回収率ベースの分離を前提にした計算である。<b>WGS の寄与と DME の蓄積はどちらもモデル依存が大きい</b>ので、実測で確かめる価値はある。その場合<b>(a) の T-100（1.04 MPaG・10.4 mol/h）から入るのが妥当</b> — 装置が桁違いに組みやすく、MA の落ち方も緩やか（η = 0.5 で −3.0 %）なので、機構の確認に適する。</p>
+    </div>
   </section>
 
   <footer>
