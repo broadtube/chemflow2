@@ -1,0 +1,466 @@
+<title>苛性ソーダ吸収塔の寸法 — NaOH スクラバーの塔高と充填量</title>
+<style>
+  :root{
+    --ink:#1b242c; --muted:#5b6873; --faint:#8a95a0;
+    --paper:#f5f6f3; --panel:#ffffff; --panel-2:#eef1ee; --line:#dbe0dd;
+    --accent:#0d6d72; --accent-soft:#e2efef; --accent-ink:#0a5155;
+    --amber:#a15c11; --amber-soft:#f6ecdc; --amber-line:#e4c79a;
+    --code-bg:#f0f2ef; --shadow:0 1px 2px rgba(20,30,40,.05),0 8px 24px rgba(20,30,40,.05);
+    --serif:"Iowan Old Style","Palatino Linotype",Palatino,"Book Antiqua",Georgia,serif;
+    --sans:ui-sans-serif,"Segoe UI",system-ui,"Helvetica Neue",Arial,sans-serif;
+    --mono:ui-monospace,"SFMono-Regular","Cascadia Code","Roboto Mono",Consolas,monospace;
+  }
+  @media (prefers-color-scheme:dark){
+    :root{
+      --ink:#e7edf0; --muted:#9aa7b1; --faint:#71808b;
+      --paper:#0f151a; --panel:#161e25; --panel-2:#1c262e; --line:#2a353e;
+      --accent:#45b6bb; --accent-soft:#12312f; --accent-ink:#7fd4d7;
+      --amber:#d69848; --amber-soft:#2b2113; --amber-line:#5a441f;
+      --code-bg:#1a232b; --shadow:0 1px 2px rgba(0,0,0,.3),0 10px 30px rgba(0,0,0,.35);
+    }
+  }
+  :root[data-theme="light"]{
+    --ink:#1b242c; --muted:#5b6873; --faint:#8a95a0; --paper:#f5f6f3; --panel:#ffffff;
+    --panel-2:#eef1ee; --line:#dbe0dd; --accent:#0d6d72; --accent-soft:#e2efef; --accent-ink:#0a5155;
+    --amber:#a15c11; --amber-soft:#f6ecdc; --amber-line:#e4c79a; --code-bg:#f0f2ef;
+    --shadow:0 1px 2px rgba(20,30,40,.05),0 8px 24px rgba(20,30,40,.05);
+  }
+  :root[data-theme="dark"]{
+    --ink:#e7edf0; --muted:#9aa7b1; --faint:#71808b; --paper:#0f151a; --panel:#161e25;
+    --panel-2:#1c262e; --line:#2a353e; --accent:#45b6bb; --accent-soft:#12312f; --accent-ink:#7fd4d7;
+    --amber:#d69848; --amber-soft:#2b2113; --amber-line:#5a441f; --code-bg:#1a232b;
+    --shadow:0 1px 2px rgba(0,0,0,.3),0 10px 30px rgba(0,0,0,.35);
+  }
+
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--sans);
+    line-height:1.6;-webkit-font-smoothing:antialiased;font-size:16px;}
+  .wrap{max-width:920px;margin:0 auto;padding:0 24px 96px;}
+
+  nav.bar{position:sticky;top:0;z-index:20;background:color-mix(in srgb,var(--paper) 88%,transparent);
+    backdrop-filter:blur(10px);border-bottom:1px solid var(--line);}
+  .bar-in{max-width:920px;margin:0 auto;padding:11px 24px;display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;}
+  .bar-in .brand{font-family:var(--mono);font-size:12px;letter-spacing:.04em;color:var(--muted);
+    text-transform:uppercase;margin-right:auto;}
+  .bar-in a{font-size:13.5px;color:var(--ink);text-decoration:none;padding:3px 10px;border-radius:999px;
+    border:1px solid transparent;transition:background .15s,border-color .15s;}
+  .bar-in a:hover{background:var(--accent-soft);border-color:var(--line);}
+  .bar-in a:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
+
+  header.hero{padding:60px 0 34px;border-bottom:1px solid var(--line);margin-bottom:8px;}
+  .eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.13em;text-transform:uppercase;
+    color:var(--accent-ink);margin:0 0 16px;}
+  h1{font-family:var(--serif);font-weight:600;font-size:clamp(30px,5vw,44px);line-height:1.1;
+    letter-spacing:-.01em;margin:0 0 14px;text-wrap:balance;}
+  .lede{font-size:17px;color:var(--muted);max-width:64ch;margin:0;}
+  .lede b{color:var(--ink);font-weight:600;}
+
+  .legend{margin:26px 0 0;display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));
+    gap:10px 20px;padding:18px 20px;background:var(--panel-2);border:1px solid var(--line);border-radius:12px;}
+  .legend dl{margin:0;display:flex;gap:10px;align-items:baseline;font-size:13.5px;}
+  .legend dt{font-family:var(--mono);color:var(--accent-ink);white-space:nowrap;}
+  .legend dd{margin:0;color:var(--muted);}
+
+  section{padding-top:52px;scroll-margin-top:64px;}
+  .sec-head{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;margin-bottom:4px;}
+  .sec-head h2{font-family:var(--serif);font-weight:600;font-size:27px;margin:0;letter-spacing:-.01em;}
+  .tag{font-family:var(--mono);font-size:11.5px;text-transform:uppercase;letter-spacing:.08em;
+    color:var(--accent-ink);background:var(--accent-soft);border:1px solid var(--line);
+    padding:2px 9px;border-radius:999px;}
+  .cite{font-size:13.5px;color:var(--muted);margin:6px 0 22px;}
+  .cite code{font-family:var(--mono);font-size:12.5px;background:var(--code-bg);padding:1px 6px;border-radius:5px;}
+  .subhead{font-family:var(--serif);font-weight:600;font-size:21px;margin:42px 0 4px;letter-spacing:-.01em;
+    padding-top:22px;border-top:1px solid var(--line);text-wrap:balance;}
+
+  .rxns{display:flex;flex-direction:column;gap:8px;margin:0 0 22px;padding:0;list-style:none;}
+  .rxns li{display:flex;gap:12px;align-items:center;font-size:15px;padding:8px 14px;background:var(--panel);
+    border:1px solid var(--line);border-radius:9px;box-shadow:var(--shadow);}
+  .rxns .n{font-family:var(--mono);font-size:12px;color:var(--accent-ink);border:1px solid var(--line);
+    background:var(--accent-soft);border-radius:6px;padding:1px 7px;white-space:nowrap;}
+  .rxns .eq{font-family:var(--serif);font-size:16.5px;}
+  .rxns .lbl{margin-left:auto;font-size:12.5px;color:var(--muted);font-family:var(--mono);
+    text-transform:uppercase;letter-spacing:.05em;}
+
+  .eqcard{background:var(--panel);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);
+    margin:14px 0;overflow:hidden;}
+  .eqcard .cap{display:flex;align-items:baseline;gap:12px;padding:10px 18px;background:var(--panel-2);
+    border-bottom:1px solid var(--line);}
+  .eqcard .cap .name{font-family:var(--mono);font-size:12.5px;color:var(--accent-ink);}
+  .eqcard .cap .unit{margin-left:auto;font-family:var(--mono);font-size:11.5px;color:var(--muted);}
+  .eqcard .eqbody{padding:16px 18px;overflow-x:auto;}
+  mjx-container[display]{margin:2px 0!important;}
+  .eqbody mjx-container{color:var(--ink);}
+
+  .note{border-left:3px solid var(--amber);background:var(--amber-soft);border-radius:0 10px 10px 0;
+    padding:14px 18px;margin:16px 0;font-size:14.5px;}
+  .note.acc{border-left-color:var(--accent);background:var(--accent-soft);}
+  .note .h{font-family:var(--mono);font-size:11.5px;text-transform:uppercase;letter-spacing:.09em;
+    color:var(--amber);margin:0 0 6px;font-weight:600;}
+  .note.acc .h{color:var(--accent-ink);}
+  .note p{margin:6px 0 0;} .note p:first-of-type{margin-top:0;}
+  .note code,.inl{font-family:var(--mono);font-size:12.5px;background:var(--code-bg);padding:1px 6px;border-radius:5px;}
+
+  .tbl-scroll{overflow-x:auto;margin:14px 0;border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);}
+  table{border-collapse:collapse;width:100%;font-size:14px;background:var(--panel);min-width:min(100%,520px);}
+  caption{caption-side:top;text-align:left;font-family:var(--mono);font-size:11.5px;text-transform:uppercase;
+    letter-spacing:.07em;color:var(--muted);padding:12px 16px 8px;}
+  th,td{padding:9px 14px;text-align:right;border-bottom:1px solid var(--line);
+    font-variant-numeric:tabular-nums;font-family:var(--mono);font-size:13px;white-space:nowrap;}
+  th:first-child,td:first-child{text-align:left;font-family:var(--sans);}
+  thead th{color:var(--muted);font-weight:600;border-bottom:1.5px solid var(--line);
+    background:var(--panel-2);font-size:11.5px;text-transform:uppercase;letter-spacing:.04em;}
+  tbody tr:last-child td{border-bottom:none;}
+  tbody tr:hover td{background:var(--panel-2);}
+  td.match{color:#1c62c9;} td.diff{color:var(--amber);}
+  @media (prefers-color-scheme:dark){ td.match{color:#6fb2ff;} }
+  :root[data-theme="light"] td.match{color:#1c62c9;}
+  :root[data-theme="dark"] td.match{color:#6fb2ff;}
+  .rolecol{color:var(--muted);font-family:var(--sans)!important;font-size:12.5px;text-align:left!important;}
+
+  figure{margin:18px 0;background:var(--panel);border:1px solid var(--line);border-radius:12px;
+    box-shadow:var(--shadow);padding:14px;}
+  figure img{width:100%;height:auto;display:block;border-radius:8px;}
+  figcaption{font-size:13px;color:var(--muted);margin-top:10px;}
+
+  footer{margin-top:64px;padding-top:26px;border-top:1px solid var(--line);color:var(--muted);font-size:13.5px;}
+  footer h3{font-family:var(--mono);font-size:12px;text-transform:uppercase;letter-spacing:.09em;color:var(--ink);margin:0 0 12px;}
+  footer ul{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:7px;}
+  footer li{display:flex;gap:10px;flex-wrap:wrap;}
+  footer .f{font-family:var(--mono);font-size:12px;color:var(--accent-ink);}
+  footer .d{color:var(--faint);}
+  footer .foot-grp{font-family:var(--mono);font-size:11px;text-transform:uppercase;letter-spacing:.06em;
+    color:var(--muted);margin:18px 0 6px;}
+  footer .foot-grp:first-of-type{margin-top:2px;}
+  a.doi{color:var(--accent-ink);text-decoration:none;border-bottom:1px solid var(--line);}
+  a.doi:hover{border-bottom-color:var(--accent);}
+  @media (max-width:560px){ .wrap{padding:0 16px 72px;} .bar-in{padding:10px 16px;} .rxns .lbl{display:none;} }
+</style>
+
+<script>
+  window.MathJax = {
+    tex: { inlineMath: [['\\(','\\)']], displayMath: [['\\[','\\]']] },
+    svg: { fontCache: 'global' },
+    options: { skipHtmlTags: ['script','noscript','style','textarea','pre','code'] }
+  };
+</script>
+<script id="MathJax-script" async
+        src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
+
+<nav class="bar">
+  <div class="bar-in">
+    <span class="brand">NaOH scrubber · column sizing</span>
+    <a href="#why">η だけで決まる理由</a>
+    <a href="#ntu">NTU</a>
+    <a href="#htu">HTU と充填体積</a>
+    <a href="#cases">T-100 と T-101</a>
+    <a href="#regime">律速域の確認</a>
+    <a href="#liquid">液側</a>
+    <a href="#impl">実装との接続</a>
+    <a href="#limits">前提と限界</a>
+  </div>
+</nav>
+
+<div class="wrap">
+  <header class="hero">
+    <p class="eyebrow">NaOH scrubber · packed column sizing</p>
+    <h1>苛性ソーダ吸収塔の寸法 — chemflow2 の外で決まる部分</h1>
+    <p class="lede">chemflow2 のフローシートには <b>CO₂ 除去率 η</b> しか現れない。塔の高さ・径・充填量はそこには入らないが、実験装置を組むには必要になる。ここでは <b>η → 塔の寸法</b> を結ぶ最小限の計算をまとめる。結論から言うと、<b>本件の規模では物質移動に必要な充填体積は数十 mL のオーダー</b>で、塔の寸法を実際に決めるのは物質移動ではなく<b>濡れ性・液分散・耐圧</b>といった実務制約のほうである。</p>
+
+    <div class="legend" aria-label="記号の凡例">
+      <dl><dt>η</dt><dd>CO₂ 除去率 [−]（chemflow2 に渡す唯一の量）</dd></dl>
+      <dl><dt>NTU<sub>OG</sub></dt><dd>気相基準の移動単位数 [−]</dd></dl>
+      <dl><dt>HTU<sub>OG</sub></dt><dd>気相基準の移動単位高さ [m]</dd></dl>
+      <dl><dt>k<sub>G</sub>a</dt><dd>気膜の容積物質移動係数 [mol/(m³·s·Pa)]</dd></dl>
+      <dl><dt>Ha</dt><dd>Hatta 数 [−]（反応の速さ / 拡散の速さ）</dd></dl>
+      <dl><dt>E<sub>∞</sub></dt><dd>瞬間反応での増強係数の上限 [−]</dd></dl>
+      <dl><dt>G, L</dt><dd>ガス / 液のモル流量 [mol/s]</dd></dl>
+    </div>
+  </header>
+
+  <!-- ============ なぜ η だけで決まるか ============ -->
+  <section id="why">
+    <div class="sec-head">
+      <h2>1 &nbsp;なぜ塔の性能が η ひとつに縮退するのか</h2>
+      <span class="tag">irreversible</span>
+    </div>
+    <p class="cite">前提: 苛性ソーダによる CO₂ 吸収は<b>化学吸収</b>であり、生成する Na₂CO₃ から CO₂ が戻らない（不可逆）。</p>
+
+    <ul class="rxns">
+      <li><span class="n">全体</span><span class="eq">CO₂ + 2 NaOH → Na₂CO₃ + H₂O</span><span class="lbl">irreversible</span></li>
+      <li><span class="n">素反応 1</span><span class="eq">CO₂ + OH⁻ → HCO₃⁻</span><span class="lbl">rate determining</span></li>
+      <li><span class="n">素反応 2</span><span class="eq">HCO₃⁻ + OH⁻ → CO₃²⁻ + H₂O</span><span class="lbl">instantaneous</span></li>
+    </ul>
+
+    <p>過剰の OH⁻ がある限り素反応 2 は瞬時に進むので、正味は 1 式にまとまる。物理吸収（アミン・水洗）と決定的に違うのは、<b>液側の平衡 CO₂ 分圧が実質ゼロ</b>になること:</p>
+
+    <div class="eqcard">
+      <div class="cap"><span class="name">平衡分圧</span><span class="unit">[Pa]</span></div>
+      <div class="eqbody">\[ p_{\mathrm{CO_2}}^{*} \simeq 0 \qquad (\text{過剰 NaOH がある間}) \]</div>
+    </div>
+
+    <p>推進力 \(p - p^{*}\) が \(p\) そのものになるため、<b>塔の性能を決めるパラメータが「入口分圧に対する出口分圧の比」だけ</b>になる。これが η である。液流量・液組成・入口濃度は（過剰 NaOH がある限り）塔高に効かない。</p>
+
+    <div class="note acc">
+      <p class="h">→ フローシートとの分業</p>
+      <p>だから chemflow2 側は <b>η だけ</b>を持てばよく、塔高は本文書の手計算で別に決められる。逆に言えば、<b>NaOH が枯れた瞬間にこの前提は崩れる</b>（炭酸水素塩側に寄り、平衡分圧が立ち上がる）。<code>examples/example_co2_removal.py</code> の <code>EXCESS = 1.2</code> はその余裕。</p>
+    </div>
+  </section>
+
+  <!-- ============ NTU ============ -->
+  <section id="ntu">
+    <div class="sec-head">
+      <h2>2 &nbsp;必要な移動単位数 NTU</h2>
+      <span class="tag">ln(1/(1−η))</span>
+    </div>
+
+    <p>気相基準の移動単位数は、モル比 \(Y = y/(1-y)\)（不活性ガス 1 mol あたりの CO₂）を使うと</p>
+
+    <div class="eqcard">
+      <div class="cap"><span class="name">NTU の定義と、不可逆吸収での帰結</span><span class="unit">[−]</span></div>
+      <div class="eqbody">\[ \mathrm{NTU_{OG}} \;=\; \int_{Y_{\mathrm{out}}}^{Y_{\mathrm{in}}} \frac{dY}{Y - Y^{*}} \;\xrightarrow{\;Y^{*}=0\;}\; \ln\frac{Y_{\mathrm{in}}}{Y_{\mathrm{out}}} \;=\; \ln\frac{1}{1-\eta} \]</div>
+    </div>
+
+    <p>不活性ガス流量が一定なら \(Y_{\mathrm{out}}/Y_{\mathrm{in}} = 1-\eta\) なので、<b>NTU は η だけの関数</b>になる。系や圧力に依らない。</p>
+
+    <div class="tbl-scroll">
+      <table>
+        <caption>除去率 η と必要 NTU（不可逆吸収）</caption>
+        <thead><tr><th>η</th><th>1 − η</th><th>NTU<sub>OG</sub></th><th class="rolecol">位置づけ</th></tr></thead>
+        <tbody>
+          <tr><td>50 %</td><td>0.5</td><td>0.693</td><td class="rolecol">ごく浅い塔で足りる</td></tr>
+          <tr><td>90 %</td><td>0.1</td><td>2.303</td><td class="rolecol">本件の既定値</td></tr>
+          <tr><td>95 %</td><td>0.05</td><td>3.00</td><td class="rolecol">—</td></tr>
+          <tr><td>99 %</td><td>0.01</td><td>4.605</td><td class="rolecol">90 % の 2 倍で届く</td></tr>
+          <tr><td>99.9 %</td><td>0.001</td><td>6.908</td><td class="rolecol">90 % の 3 倍</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="note acc">
+      <p class="h">対数なので深追いが安い</p>
+      <p>η を 90 % から 99 % に上げても塔高は 2 倍にしかならない。<b>「あと一桁抜く」のに必要な追加は常に ln 10 = 2.303 単位</b>で一定。この性質のおかげで、実験では η を高めに取っておいても損が小さい。</p>
+    </div>
+  </section>
+
+  <!-- ============ HTU と充填体積 ============ -->
+  <section id="htu">
+    <div class="sec-head">
+      <h2>3 &nbsp;HTU・塔高・充填体積</h2>
+      <span class="tag">V ∝ NTU·G/P</span>
+    </div>
+
+    <div class="eqcard">
+      <div class="cap"><span class="name">塔高</span><span class="unit">[m]</span></div>
+      <div class="eqbody">\[ Z \;=\; \mathrm{HTU_{OG}} \cdot \mathrm{NTU_{OG}}, \qquad \mathrm{HTU_{OG}} \;=\; \frac{G_M}{k_G a \, P} \]</div>
+    </div>
+
+    <p>\(G_M\) はガスのモル流束 [mol/(m²·s)]、\(P\) は全圧 [Pa]。塔断面積 \(A\) を掛ければ流束が流量に変わり、<b>断面積が消える</b>:</p>
+
+    <div class="eqcard">
+      <div class="cap"><span class="name">必要な充填体積（断面積に依らない）</span><span class="unit">[m³]</span></div>
+      <div class="eqbody">\[ V \;=\; A \cdot Z \;=\; \frac{\mathrm{NTU_{OG}} \cdot G}{k_G a \, P} \;=\; \frac{G}{k_G a\,P}\,\ln\frac{1}{1-\eta} \]</div>
+    </div>
+
+    <p>設計上重要なのはこの形。<b>必要充填体積はガスのモル流量に比例し、全圧に反比例する</b>。径をどう取るかは物質移動ではなくフラッディングと濡れ性の問題に落ちる（§6）。</p>
+
+    <div class="note">
+      <p class="h">⚠ k<sub>G</sub>a は本文書で決められない量</p>
+      <p>充填材の種類・サイズ、ガス/液の流束、温度に依存する。相関式（Onda、Billet–Schultes）かメーカーのデータから取ること。以下では<b>ランダム充填で典型的とされる \(k_G a \approx 2.7\times10^{-4}\ \mathrm{mol/(m^3\!\cdot\!s\!\cdot\!Pa)}\)（≈ 100 kmol/(m³·h·atm)）</b>をオーダー見積り用に置く。この値は文献の代表値であって、本件の充填・流量で測ったものではない。</p>
+    </div>
+  </section>
+
+  <!-- ============ 2 つの設置位置 ============ -->
+  <section id="cases">
+    <div class="sec-head">
+      <h2>4 &nbsp;T-100（前段）と T-101（循環）の比較</h2>
+      <span class="tag">A_base · η = 0.9</span>
+    </div>
+    <p class="cite">数値の出どころ: <code>examples/output/plant3_A_base_streams.xlsx</code>（除去なしの収束解）と <code>examples/example_pattern1_plant3.py</code> の A_base 改質条件。</p>
+
+    <div class="tbl-scroll">
+      <table>
+        <caption>塔に入るガスと、必要充填体積のオーダー（η = 0.9, NTU = 2.303）</caption>
+        <thead><tr><th>項目</th><th>T-100 前段 (a)</th><th>T-101 循環 (b)</th><th class="rolecol">備考</th></tr></thead>
+        <tbody>
+          <tr><td>処理するガス</td><td>DryGas</td><td>CondGas</td><td class="rolecol">—</td></tr>
+          <tr><td>全圧 [MPa abs]</td><td>1.141</td><td>5.101</td><td class="rolecol">1.04 / 5 MPaG</td></tr>
+          <tr><td>ガス流量 [mol/h]</td><td>10.41</td><td>60.36</td><td class="rolecol">T-101 は除去なしの値</td></tr>
+          <tr><td>CO₂ [mol%]</td><td>16.09</td><td>58.56</td><td class="rolecol">同上</td></tr>
+          <tr><td>CO₂ [mol/h]</td><td>1.675</td><td>35.35</td><td class="rolecol">同上</td></tr>
+          <tr><td>V<sub>充填</sub> [mL] 目安</td><td class="match">21</td><td class="diff">27</td><td class="rolecol">V = NTU·G/(k<sub>G</sub>a·P)</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="note">
+      <p class="h">⚠ T-101 の入口は「除去なし」の値であって、塔を入れた収束解ではない</p>
+      <p>循環系に塔を入れると<b>ループ内 CO₂ 濃度は激減する</b>。定常では系から出る CO₂ = 供給 CO₂ + ループ内の正味生成 で釣り合うので、除去率 η を上げてもベントに出る量は増えない — 変わるのは<b>ループ内の濃度</b>だけ。上表の 35.35 mol/h は η = 0 の極限であり、η = 0.9 の収束解ではガス量・CO₂ 濃度とも大きく下がる。<b>確定値は現在流している総当たり計算の <code>co2removal_A_base_b_recycle_eta0.9_plant3.xlsx</code> から取り直すこと。</b></p>
+    </div>
+
+    <div class="note acc">
+      <p class="h">高圧が流量の不利を打ち消す</p>
+      <p>T-101 はガスを 6 倍近く処理するのに、必要な充填体積は T-100 と同オーダーに収まる。\(V \propto G/P\) で、5 倍の圧力が 6 倍の流量をほぼ相殺するため。<b>物質移動の観点では (b) が不利ということはない。</b>不利なのは装置側 — 5 MPa の苛性スクラバーは相応の圧力容器になる（§7）。</p>
+    </div>
+
+    <p>どちらも <b>数十 mL</b> のオーダーで、25 mm 径 × 0.5 m の実験塔（充填体積 ≈ 245 mL）なら 10 倍の余裕がある。k<sub>G</sub>a を 10 分の 1 に見積もっても 210 / 270 mL で収まる。<b>本件の規模では、塔高を決めるのは物質移動ではない。</b></p>
+  </section>
+
+  <!-- ============ 律速域 ============ -->
+  <section id="regime">
+    <div class="sec-head">
+      <h2>5 &nbsp;気膜律速と言ってよいか — Hatta 数による確認</h2>
+      <span class="tag">Ha vs E<sub>∞</sub></span>
+    </div>
+
+    <p>§3 の \(\mathrm{HTU_{OG}} = G_M/(k_G a P)\) は<b>液膜抵抗を無視できる</b>ことを前提にしている。化学吸収でそれが成り立つかは Hatta 数で判定する。</p>
+
+    <div class="eqcard">
+      <div class="cap"><span class="name">Hatta 数と瞬間反応の上限</span><span class="unit">[−]</span></div>
+      <div class="eqbody">\[ \mathrm{Ha} = \frac{\sqrt{k_2\,[\mathrm{OH^-}]\,D_{\mathrm{CO_2}}}}{k_L}, \qquad E_{\infty} = 1 + \frac{[\mathrm{OH^-}]\,D_{\mathrm{OH^-}}}{2\,C^{*}_{\mathrm{CO_2}}\,D_{\mathrm{CO_2}}} \]</div>
+    </div>
+
+    <p>判定は次の 2 段:</p>
+    <ul class="rxns">
+      <li><span class="n">Ha ≫ 3</span><span class="eq">液膜内で反応が完結 = 高速反応領域</span><span class="lbl">enhancement E ≈ Ha</span></li>
+      <li><span class="n">Ha ≫ E<sub>∞</sub></span><span class="eq">OH⁻ の供給が追いつかない = 瞬間反応領域</span><span class="lbl">E = E<sub>∞</sub></span></li>
+    </ul>
+
+    <p>40 ℃・20 wt% NaOH（[OH⁻] ≈ 5.0 kmol/m³）で代表値を入れると \(k_2 \approx 8.5\ \mathrm{m^3/(mol\!\cdot\!s)}\)、\(D_{\mathrm{CO_2}} \approx 1.9\times10^{-9}\ \mathrm{m^2/s}\)、\(k_L \approx 1\times10^{-4}\ \mathrm{m/s}\) から <b>Ha ≈ 90</b>。3 をはるかに超えるので高速反応領域には確実に入る。問題は \(E_\infty\) との大小で、これは<b>CO₂ 分圧に依存する</b>:</p>
+
+    <div class="tbl-scroll">
+      <table>
+        <caption>CO₂ 分圧による領域の移り変わり（オーダー見積り）</caption>
+        <thead><tr><th>条件</th><th>p<sub>CO₂</sub> [atm]</th><th>E<sub>∞</sub> 概算</th><th>Ha ≈ 90 との比較</th><th class="rolecol">領域</th></tr></thead>
+        <tbody>
+          <tr><td>T-100 (a)</td><td>1.8</td><td class="match">~650</td><td>Ha ≪ E<sub>∞</sub></td><td class="rolecol">高速反応・気膜律速でよい</td></tr>
+          <tr><td>T-101 (b) 収束後</td><td>~3.5</td><td class="match">~330</td><td>Ha ≪ E<sub>∞</sub></td><td class="rolecol">同上</td></tr>
+          <tr><td>T-101 (b) 除去なしの極限</td><td>29</td><td class="diff">~40</td><td>Ha &gt; E<sub>∞</sub></td><td class="diff">瞬間反応・液膜も効く</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="note">
+      <p class="h">⚠ 高 CO₂ 分圧では前提が崩れる</p>
+      <p>CO₂ 分圧が高いほど界面の \(C^{*}_{\mathrm{CO_2}}\) が上がり、OH⁻ の供給が相対的に足りなくなって \(E_\infty\) が下がる。<b>そこまで行くと液膜抵抗が無視できず、§3 の塔高式は過小評価になる</b>（液流量を増やすか NaOH 濃度を上げる必要がある）。ただし<b>定常運転ではループ CO₂ は下がるので、この領域には入らない見込み</b>。起動時など CO₂ が濃い状態を通る場合だけ注意すればよい。</p>
+      <p>なお \(C^{*}_{\mathrm{CO_2}}\) は 5 M NaOH 中の塩析（Sechenov 効果）で純水の 1/4 程度に下がるとして見積もった。上表は<b>桁の判断に使う値であって設計値ではない</b>。</p>
+    </div>
+  </section>
+
+  <!-- ============ 液側 ============ -->
+  <section id="liquid">
+    <div class="sec-head">
+      <h2>6 &nbsp;液側 — 薬剤量と、実際に塔径を決めるもの</h2>
+      <span class="tag">wetting rate</span>
+    </div>
+
+    <div class="eqcard">
+      <div class="cap"><span class="name">NaOH 所要量と苛性液流量</span><span class="unit">[mol/h], [L/h]</span></div>
+      <div class="eqbody">\[ \dot n_{\mathrm{NaOH}} = 2\,\phi\,\eta\,\dot n_{\mathrm{CO_2,in}}, \qquad \dot V_L = \frac{\dot n_{\mathrm{NaOH}} M_{\mathrm{NaOH}}}{w\,\rho_L} \]</div>
+    </div>
+
+    <p>\(\phi\) は化学量論に対する過剰率（実装では 1.2）、\(w\) は苛性液の濃度 [wt%]、\(\rho_L\) は密度。T-100（η = 0.9）の実数:</p>
+
+    <div class="tbl-scroll">
+      <table>
+        <caption>T-100 の薬剤収支（chemflow2 の <code>caustic_scrubber()</code> の解と一致）</caption>
+        <thead><tr><th>量</th><th>値</th><th class="rolecol">根拠</th></tr></thead>
+        <tbody>
+          <tr><td>除去 CO₂</td><td>1.508 mol/h</td><td class="rolecol">0.9 × 1.675</td></tr>
+          <tr><td>NaOH 所要</td><td>3.618 mol/h = 145 g/h</td><td class="rolecol">2 × 1.2 × 1.508</td></tr>
+          <tr><td>Na₂CO₃ 生成</td><td>1.508 mol/h = 160 g/h</td><td class="rolecol">除去 CO₂ と 1:1</td></tr>
+          <tr><td>20 wt% 苛性液</td><td>724 g/h ≈ 0.6 L/h</td><td class="rolecol">ρ ≈ 1.22 kg/L</td></tr>
+          <tr><td>8 時間運転あたり</td><td>NaOH 1.16 kg / 廃液 5.8 kg</td><td class="rolecol">実験室で扱える規模</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="note">
+      <p class="h">⚠ 実験規模では液が足りない — 循環必須</p>
+      <p>0.6 L/h は<b>ランダム充填の最小濡れ流束（おおむね 0.5〜3 m³/(m²·h)）を下回りかねない</b>。25 mm 径（断面 4.9×10⁻⁴ m²）なら 1.2 m³/(m²·h) で辛うじて下限付近だが、径を大きくすると即座に濡れ不足になり、充填の一部が乾いて実効 NTU が落ちる。</p>
+      <p><b>対策は液の循環</b>: 苛性液をポンプで塔に循環させて濡れ流束を確保し、Na₂CO₃ が溜まって OH⁻ が消費されたらバッチで入れ替える。この運用なら塔内の液流量（濡れ性を決める）と NaOH 補給量（薬剤収支を決める）を独立に設定できる。<b>塔径は物質移動ではなくこの濡れ性の制約で決まる</b>と考えてよい。</p>
+    </div>
+
+    <p>ガス側は逆に余裕がある。T-100 のガスは 1.14 MPa・40 ℃ で体積流量 <b>約 24 L/h</b> しかなく、25 mm 径ならフラッディングまで桁で余裕がある。<b>ガス側の制約は事実上かからない。</b></p>
+  </section>
+
+  <!-- ============ 実装との接続 ============ -->
+  <section id="impl">
+    <div class="sec-head">
+      <h2>7 &nbsp;chemflow2 との接続と、装置構成の判断</h2>
+      <span class="tag">η ↔ conversion</span>
+    </div>
+
+    <p>本文書で決めた η が、そのまま 2 か所に入る:</p>
+    <ul class="rxns">
+      <li><span class="n">主フローシート</span><span class="eq">Separator + constrain_recovery(…, {"CO₂": η})</span><span class="lbl">ガスループへの影響</span></li>
+      <li><span class="n">吸収塔サブ</span><span class="eq">Reactor(key_component="CO2", conversion=η)</span><span class="lbl">薬剤収支・原子収支</span></li>
+    </ul>
+
+    <p>逆向きに使うのが実験での本筋になる: <b>塔出口ガスの CO₂ 濃度を測って η を実測し、それをそのままシミュレーションに入れる</b>。塔高の予測が外れても、実測 η を入れればフローシートの予測は成立する。</p>
+
+    <div class="note">
+      <p class="h">⚠ 圧力の扱いが最大の実務判断</p>
+      <p>(b) の T-101 は 5 MPaG のループ内にある。<b>高圧のまま吸収すれば塔は小さく、再圧縮も要らない</b>が、高圧の苛性スクラバーは相応の圧力容器になる。減圧して常圧吸収 → 再圧縮にすると、<b>循環ガス全量（除去なしで 60 mol/h）を再圧縮する</b>ことになり、実験系では現実的でない可能性が高い。</p>
+      <p>その点 (a) の T-100 は <b>1.04 MPaG・10.4 mol/h</b> と条件が緩く、<b>実験装置としては圧倒的に組みやすい</b>。原理確認を先にやるなら (a) から入るのが妥当。</p>
+    </div>
+
+    <div class="note">
+      <p class="h">⚠ NaOH は再生できない</p>
+      <p>Na₂CO₃ として消耗し、廃液処理が要る。連続運転や規模拡大を見るなら再生可能な方式（アミン、PSA、膜）に切り替える前提で、<b>NaOH は原理確認用と割り切る</b>のが妥当。</p>
+    </div>
+
+    <div class="note">
+      <p class="h">⚠ 共吸収</p>
+      <p>ガス中の酢酸・アセトアルデヒドもアルカリに取られる。現状の計算では CondGas 側にほぼ来ていないので無視できるが、<b>実験では出口液を分析して確認すること</b>。DME・CH₄・CO・H₂ は苛性に吸収されない。</p>
+    </div>
+  </section>
+
+  <!-- ============ 前提と限界 ============ -->
+  <section id="limits">
+    <div class="sec-head">
+      <h2>8 &nbsp;この文書の前提と限界</h2>
+      <span class="tag">order of magnitude</span>
+    </div>
+
+    <ul class="rxns">
+      <li><span class="n">1</span><span class="eq">k<sub>G</sub>a は文献の代表値で、本件の充填・流量で測った値ではない</span><span class="lbl">§3</span></li>
+      <li><span class="n">2</span><span class="eq">k₂・D・k<sub>L</sub>・C* も代表値。Ha と E<sub>∞</sub> は桁の判断用</span><span class="lbl">§5</span></li>
+      <li><span class="n">3</span><span class="eq">等温・軸方向分散なし・液は完全混合しないものとした</span><span class="lbl">全体</span></li>
+      <li><span class="n">4</span><span class="eq">吸収熱による温度上昇を見ていない</span><span class="lbl">§5</span></li>
+      <li><span class="n">5</span><span class="eq">T-101 の入口組成は η = 0 の値。収束解で取り直すこと</span><span class="lbl">§4</span></li>
+    </ul>
+
+    <p>1〜2 のため、<b>本文書の充填体積は「数十 mL のオーダー」以上の精度を主張しない</b>。ただし §4 で見たとおり k<sub>G</sub>a を 10 分の 1 に見積もっても実験塔の容量に対して十分小さいので、<b>「物質移動は律速にならない」という結論自体は桁の誤差に対して頑健</b>である。</p>
+
+    <p>4 の吸収熱は、CO₂ + 2NaOH の反応熱がかなり大きい（おおむね −100 kJ/mol-CO₂ 台）ため本来は無視できないが、本件は<b>除去量が 1.5 mol/h と小さく液を循環させる</b>ので、循環液の熱容量で吸収できる範囲に収まる見込み。規模を上げるときは再検討が要る。</p>
+  </section>
+
+  <footer>
+    <h3>参照</h3>
+
+    <p class="foot-grp">教科書（式の出どころ）</p>
+    <ul>
+      <li><span class="f">Danckwerts (1970)</span><span class="d">P. V. Danckwerts, <i>Gas-Liquid Reactions</i>, McGraw-Hill. 〔Hatta 数・増強係数 E・E<sub>∞</sub> の定義と領域判定の原典的教科書〕</span></li>
+      <li><span class="f">Astarita 他 (1983)</span><span class="d">G. Astarita, D. W. Savage, A. Bisio, <i>Gas Treating with Chemical Solvents</i>, Wiley. 〔苛性・アミン系の設計。不可逆吸収での NTU の扱い〕</span></li>
+      <li><span class="f">Treybal (1980)</span><span class="d">R. E. Treybal, <i>Mass-Transfer Operations</i>, 3rd ed., McGraw-Hill. 〔HTU–NTU 法、充填塔の濡れ流束とフラッディング〕</span></li>
+      <li><span class="f">Perry's (8th ed.)</span><span class="d">D. W. Green, R. H. Perry, <i>Perry's Chemical Engineers' Handbook</i>, §14 Equipment for Distillation, Gas Absorption. 〔k<sub>G</sub>a の代表値と Onda 相関〕</span></li>
+    </ul>
+
+    <p class="foot-grp">本プロジェクトの実装</p>
+    <ul>
+      <li><span class="f">examples/example_co2_removal.py</span><span class="d"><code>caustic_scrubber()</code> — Mixer + Reactor + Separator で組んだ吸収塔サブフローシート。薬剤収支と原子収支。η は <code>Reactor(conversion=η)</code></span></li>
+      <li><span class="f">examples/example_plant3.py</span><span class="d"><code>build(co2_removal=η)</code> — 凝縮器とパージ分岐の間に T-101 を挿す（除去位置 (b)）</span></li>
+      <li><span class="f">examples/example_pattern1_plant3.py</span><span class="d"><code>solve_reformer(co2_removal=η)</code> — 改質器の下流に T-100 を置く（除去位置 (a)）</span></li>
+      <li><span class="f">chemflow2/core/reaction.py</span><span class="d"><code>Reaction.validate_atom_balance()</code> — CO₂ + 2NaOH → Na₂CO₃ + H₂O の原子収支を生成時に検査</span></li>
+      <li><span class="f">examples/output/plant3_A_base_streams.xlsx</span><span class="d">§4 の入口ガス組成の出どころ（除去なしの収束解）</span></li>
+    </ul>
+
+    <p class="foot-grp">未確定 — 実測で埋めるべき値</p>
+    <ul>
+      <li><span class="f">k<sub>G</sub>a</span><span class="d">使う充填材・流量での実測または相関計算。§3 の見積りを置き換える</span></li>
+      <li><span class="f">η</span><span class="d">塔出口ガスの CO₂ 濃度から実測。これがシミュレーションへの唯一の入力</span></li>
+      <li><span class="f">最小濡れ流束</span><span class="d">選定した充填材の実値。§6 の塔径判断を確定させる</span></li>
+      <li><span class="f">T-101 入口組成</span><span class="d">総当たり計算 <code>co2removal_*_b_recycle_eta*_plant3.xlsx</code> の収束解から取り直す</span></li>
+    </ul>
+  </footer>
+</div>
