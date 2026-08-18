@@ -58,7 +58,9 @@ liq = StreamCondition(T=40, P="5MPaG", phase="liquid")
 NAMES = ["1. Steam1", "2. ReactorIn", "3. R1Out", "4. Cond1Gas", "5. Cond1Liq",
          "6. Col1Top", "7. Sep1Liq", "8. RecycleMeOH", "9. Water", "10. R2Out",
          "11. Cond2Gas", "12. Purge", "13. RecycleGas", "14. Cond2Liq",
-         "15. MethylAcetate", "16. Col3Bottoms"]
+         "15. MethylAcetate", "16. Col3Bottoms",
+         # 以下は co2_removal を指定したときだけ現れる（既定の 16 本には影響しない）
+         "17. ScrubbedGas", "18. CO2Vent"]
 
 
 def hybrid_masses(v1: float) -> tuple[float, float]:
@@ -71,15 +73,42 @@ def volume_for(n_molh: float) -> float:
     return n_molh * VM_STP / SV
 
 
-def build(v1: float, v2: float, seed: dict[str, np.ndarray] | None = None):
-    """ハイブリッド床 v1 [m³]・カルボニル化床 v2 [m³] のフローシートを組む。"""
+def build(v1: float, v2: float, seed: dict[str, np.ndarray] | None = None,
+          feed: dict[str, float] | None = None,
+          co2_removal: float | None = None, purge: float = PURGE,
+          co2_position: str = "recycle"):
+    """ハイブリッド床 v1 [m³]・カルボニル化床 v2 [m³] のフローシートを組む。
+
+    feed を渡すと新鮮供給の組成を差し替えられる（前工程 pattern1 の DryGas を
+    そのまま流し込むため。既定は STEAM1）。
+
+    co2_removal に除去率 η を渡すと CO2 除去塔を 1 段挿す。plant4 は凝縮器が
+    2 つあるので、**どちらに付けるかを co2_position で選ぶ**:
+
+        "recycle"      Cond2Gas と SP-gas の間（= plant3 の (b) と同じ位置）
+                       Cond2Gas ─[T-101]→ ScrubbedGas ─[SP-gas]→ Purge / RecycleGas
+
+        "interstage"   Cond1Gas と R2 の間（**plant4 でのみ可能な位置**）
+                       Cond1 は既に水を抜く場所なので、そこで CO2 も抜けば
+                       カルボニル化床に入る CO 分圧を直接上げられる。H-MOR は
+                       水で強く阻害されるうえ CO2 で希釈されると不利なので、
+                       plant3 には無いこの位置に効く見込みがある。
+                       Cond1Gas ─[T-102]→ ScrubbedGas → R2
+
+    塔はガス側に対しては「CO2 だけを η の割合で抜く分離器」でしかないので、
+    Separator 1 個 + 回収率制約 1 本で表す（変数・式とも +12 で閉じる）。
+    苛性ソーダの量論は循環系に影響しないため、ここには入れない。
+    """
+    if co2_position not in ("recycle", "interstage"):
+        raise ValueError('co2_position は "recycle" か "interstage"')
 
     def S(i: int, cond: StreamCondition = gas) -> Stream:
         nm = NAMES[i - 1]
         return Stream(C, name=nm, order=i, condition=cond,
                       guess=seed.get(nm) if seed else None)
 
-    Steam1      = Stream(C, name=NAMES[0], order=1, condition=gas, flows=STEAM1)
+    Steam1      = Stream(C, name=NAMES[0], order=1, condition=gas,
+                         flows=feed if feed is not None else STEAM1)
     ReactorIn   = S(2)
     R1Out       = S(3)          # ハイブリッド床（合成＋脱水）の出口
     Cond1Gas    = S(4)          # → カルボニル化床へ（水/MeOH を抜いた後）
@@ -96,6 +125,24 @@ def build(v1: float, v2: float, seed: dict[str, np.ndarray] | None = None):
     MA_Product  = S(15, liq)    # Column3 留出 = 酢酸メチル
     Col3Bottoms = S(16, liq)    # Column3 缶出 = 系外へ
 
+    # --- CO2 除去塔（オプション）---
+    # 塔を入れると、その下流ユニットの入口が ScrubbedGas に差し替わる。
+    scrub_streams: list[Stream] = []
+    scrub_units: list = []
+    r2_feed, split_feed = Cond1Gas, Cond2Gas
+    if co2_removal is not None:
+        ScrubbedGas = S(17)
+        CO2Vent     = Stream(["CO2"], name=NAMES[17], order=18, condition=gas,
+                             guess=seed.get(NAMES[17]) if seed else None)
+        scrub_streams = [ScrubbedGas, CO2Vent]
+        src = Cond1Gas if co2_position == "interstage" else Cond2Gas
+        tag = "T-102 CO2除去塔(段間)" if co2_position == "interstage" else "T-101 CO2除去塔(循環)"
+        scrub_units = [Separator(src, [ScrubbedGas, CO2Vent], name=tag)]
+        if co2_position == "interstage":
+            r2_feed = ScrubbedGas
+        else:
+            split_feed = ScrubbedGas
+
     m_syn, m_deh = hybrid_masses(v1)
     m_ma = RHO_MA * v2
 
@@ -107,20 +154,27 @@ def build(v1: float, v2: float, seed: dict[str, np.ndarray] | None = None):
     Cond1 = Separator(R1Out, [Cond1Gas, Cond1Liq], name="Cond1")
     Col1  = Separator(Cond1Liq, [Col1Top, Sep1Liq], name="Column1")
     Col2  = Separator(Sep1Liq, [RecycleMeOH, Water], name="Column2")
-    R2    = KineticReactor(inlet=Cond1Gas, outlet=R2Out,
+    R2    = KineticReactor(inlet=r2_feed, outlet=R2Out,
                            masses={"carbonylation": m_ma},
                            models={"carbonylation": "DTU-Cheung2007-2"},
                            T=250, P="5MPaG", n_points=2, name="R2 MA bed")
     Cond2 = Separator(R2Out, [Cond2Gas, Cond2Liq], name="Cond2")
-    SPg   = Splitter(Cond2Gas, [Purge, RecycleGas], ratios=[PURGE, 1 - PURGE], name="SP-gas")
+    SPg   = Splitter(split_feed, [Purge, RecycleGas], ratios=[purge, 1 - purge], name="SP-gas")
     Col3  = Separator(Cond2Liq, [MA_Product, Col3Bottoms], name="Column3")
 
     streams = [Steam1, ReactorIn, R1Out, Cond1Gas, Cond1Liq, Col1Top, Sep1Liq,
                RecycleMeOH, Water, R2Out, Cond2Gas, Purge, RecycleGas, Cond2Liq,
-               MA_Product, Col3Bottoms]
+               MA_Product, Col3Bottoms] + scrub_streams
     problem = Problem(streams=streams,
-                      units=[M1, R1, Cond1, Col1, Col2, R2, Cond2, SPg, Col3],
+                      units=[M1, R1, Cond1, Col1, Col2, R2, Cond2, SPg, Col3] + scrub_units,
                       name="Syngas plant (2-stage: hybrid -> knockout -> carbonylation)")
+
+    # 除去塔の指定: CO2 のみ η の割合で CO2Vent へ。CO2Vent は 1 成分ストリームなので
+    # 「他成分は回収率 0」を書く必要がない（書くと変数の無い式が増えて自由度が崩れる）。
+    if co2_removal is not None:
+        src = Cond1Gas if co2_position == "interstage" else Cond2Gas
+        problem.constrain_recovery(src, scrub_streams[1], {"CO2": float(co2_removal)},
+                                   name=f"CO2除去率={co2_removal}")
 
     # --- 分離指定（各分離器の「第2出口」への回収率）---
     # Cond1: H2/CO/CO2/DME/CH4/N2 はガス、H2O/MeOH は液（指定どおり）
@@ -157,28 +211,39 @@ RECYCLE_GUESS = 6.5
 GAS_FRACTION_GUESS = 0.95    # Cond1 のガス側に残る割合の初期推定
 
 
-def solve_with_sv(max_outer: int = 10, tol: float = 1e-4, verbose: bool = True):
+def solve_with_sv(max_outer: int = 10, tol: float = 1e-4, verbose: bool = True,
+                  feed: dict[str, float] | None = None,
+                  co2_removal: float | None = None, purge: float = PURGE,
+                  co2_position: str = "recycle", solve_tol: float = 1e-4):
     """2つの床がそれぞれ入口基準 SV を満たすまで触媒体積 (V1, V2) を外側反復する。
 
-    g(V) = [volume_for(ReactorIn) − V1, volume_for(Cond1Gas) − V2] の零点を、
+    g(V) = [volume_for(ReactorIn) − V1, volume_for(R2の入口) − V2] の零点を、
     成分ごとの割線法で探す（各評価が1回のフローシート求解なので回数を切り詰める）。
+
+    feed / co2_removal / purge / co2_position は build() にそのまま渡す。
+    solve_tol は Problem.solve の残差ノルム判定（既定 1e-4 の理由は g() のコメント）。
     """
     state: dict[str, object] = {}
 
     def g(v: np.ndarray, it: int) -> np.ndarray:
         t0 = time.time()
-        problem, streams = build(v[0], v[1], state.get("seed"))
+        problem, streams = build(v[0], v[1], state.get("seed"), feed=feed,
+                                 co2_removal=co2_removal, purge=purge,
+                                 co2_position=co2_position)
         if it == 1 and verbose:
             print("自由度 (変数, 方程式):", problem.degrees_of_freedom())
         # tol は残差ノルムの合格判定。PFR は rtol=1e-8 で積分しているので残差には
         # 流量 × 1e-8 程度のノイズ床があり、方程式 165 本ではノルムが ~3e-6 で頭打ち
         # になる。1e-4 mol/h は流量 60 mol/h に対して相対 2e-6 で、十分すぎる精度。
-        sol = problem.solve(bounds=(0, np.inf), tol=1e-4,
+        sol = problem.solve(bounds=(0, np.inf), tol=solve_tol,
                             ftol=1e-12, xtol=1e-12, gtol=1e-12)
         if not sol.success:
             raise RuntimeError(f"外側反復 {it} で収束せず: {sol}")
         n1 = float(streams[1].total_flow.eval())    # ReactorIn
-        n2 = float(streams[3].total_flow.eval())    # Cond1Gas
+        # 第2床の SV 基準は「R2 の実際の入口」。段間に除去塔を挿すと Cond1Gas では
+        # なく ScrubbedGas が R2 の入口になるので、そちらを見ないと SV がずれる。
+        r2_in = next(u.inlets[0] for u in problem.units if u.name == "R2 MA bed")
+        n2 = float(r2_in.total_flow.eval())
         v_new = np.array([volume_for(n1), volume_for(n2)])
         state["seed"] = {s.name: s.molar_flows.copy() for s in streams}
         state["problem"], state["streams"] = problem, streams
@@ -190,7 +255,7 @@ def solve_with_sv(max_outer: int = 10, tol: float = 1e-4, verbose: bool = True):
                   f"({time.time()-t0:.1f}s, PFR積分 {n_pfr}回, nfev={sol.nfev})")
         return v_new - v
 
-    n_feed = sum(STEAM1.values())
+    n_feed = sum((feed if feed is not None else STEAM1).values())
     v_prev = np.array([volume_for(RECYCLE_GUESS * n_feed),
                        volume_for(GAS_FRACTION_GUESS * RECYCLE_GUESS * n_feed)])
     g_prev = g(v_prev, 1)

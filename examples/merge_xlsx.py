@@ -36,12 +36,15 @@ example_co2_removal.py は 3 ファイルとも **同じ basis（MERGE_BASIS）�
 一対一に対応しているので、振り直すと図と表が食い違うため（番号は Stream.name の文字列
 "1. Steam1" にも埋まっている）。
 
-グローバル番号は**結合シートだけが持つ属性**として、ここで BLOCKS のオフセットから
-振る。結合シートのヘッダは 3 段:
+グローバル番号は**結合シートだけが持つ属性**として、block_plan() のオフセットから振る。
+列の並びはプロセスの流れに合わせるので、**吸収塔の位置はケース種別で変わる**
+（a_upstream は改質器と plant3 の間、b_recycle は plant3 の後ろ）。結合シートの
+ヘッダは 3 段で、ローカル番号はストリーム名の中に残るので Mermaid 図と対応が取れる:
 
     行1  ブロック帯      ── 改質器 ──        ── plant3 ──        ── T-101 吸収塔 ──
     行2  グローバル番号  101 102 …           301 302 …           401 402 …
     行3  ストリーム名    1. RG_feed 2. …     1. Steam1 2. …      1. GasIn 2. …
+                         ↑ この "1." "2." が各フローシートの Mermaid の ①② に対応
 
 実行:
     python3 examples/merge_xlsx.py A_base_b_recycle_eta0.9
@@ -62,30 +65,57 @@ from openpyxl.utils import get_column_letter
 
 OUT = os.path.join(os.path.dirname(__file__), "output")
 
-#: 結合の順序と、グローバル番号のオフセット。
-#: プロセスの流れ（改質器 → plant3）に沿って並べ、吸収塔はその直後に置く。
-#: 100 番刻みにしてあるのは、1 ブロックあたりのストリームが増えても衝突しないため。
-#: 種別ごとに桁を分けておくと、結合シートだけ見ても出どころが分かる。
-BLOCKS = [
-    ("reformer", 100, "改質器 (pattern1)"),
-    ("caustic",  200, "苛性ソーダ吸収塔"),
-    ("plant3",   300, "MA プラント (plant3)"),
-]
+#: 結合対象になりうる全種別（ラベル探索用）
+ALL_KINDS = ("reformer", "plant3", "caustic")
 
-#: A 列に来るラベルのうち、値ではなく構造を表すもの（検証時の見出し）
-_STRUCTURE_HEAD = "Component"
+
+def block_plan(label: str) -> list[tuple[str, int, str]]:
+    """ケース種別ごとの (種別, グローバル番号オフセット, 帯の表示名)。
+
+    列の並びは**プロセスの流れ**に合わせる。吸収塔の位置がケースで変わるため、
+    順序を固定にはできない:
+
+        baseline    改質器(100) → plant3(300)
+        a_upstream  改質器(100) → T-100 吸収塔(200) → plant3(300)
+        b_recycle   改質器(100) → plant3(300) → T-101 吸収塔(400)
+
+    100 番刻みなのは、1 ブロックのストリームが増えても衝突しないため。
+    桁を見れば結合シートだけで出どころが分かる。
+
+    ⚠ b_recycle の T-101 は厳密には plant3 の**途中**（凝縮器 ⑤CondGas と
+    パージ分岐の間、出口が ⑬ScrubbedGas）にある。そこに列を割り込ませると
+    plant3 の番号が飛んで読みにくくなるので、末尾に置いたうえで**帯の表示名に
+    位置を書く**という妥協にしてある。
+    """
+    reformer = ("reformer", 100, "改質器 (pattern1)")
+    plant3 = ("plant3", 300, "MA プラント (plant3)")
+    if "a_upstream" in label:
+        return [reformer,
+                ("caustic", 200, "苛性ソーダ吸収塔 T-100（改質器⑥DryGas → plant3①Steam1 の間）"),
+                plant3]
+    if "b_recycle" in label:
+        return [reformer, plant3,
+                ("caustic", 400, "苛性ソーダ吸収塔 T-101（plant3 の⑤CondGas → ⑬ScrubbedGas の間）")]
+    return [reformer, plant3]           # baseline は吸収塔なし
 
 
 def source_paths(label: str, outdir: str) -> list[tuple[str, int, str, str]]:
-    """(種別, オフセット, 表示名, パス) のリスト。存在するものだけ返す。
+    """(種別, オフセット, 表示名, パス) のリスト。
 
-    baseline ケースには吸収塔が無いなど、ブロックの有無はケースによって変わる。
+    計画された全ブロックが揃っていなければ空を返す（= 結合しない）。求解の途中で
+    改質器の xlsx だけ先に出ているケースを、黙って「1 ブロックの結合ファイル」として
+    書き出してしまうのを防ぐ。
     """
-    found = []
-    for kind, offset, title in BLOCKS:
+    found, missing = [], []
+    for kind, offset, title in block_plan(label):
         path = os.path.join(outdir, f"co2removal_{label}_{kind}.xlsx")
         if os.path.exists(path):
             found.append((kind, offset, title, path))
+        else:
+            missing.append(kind)
+    if missing:
+        print(f"  {label}: {'/'.join(missing)} が無い（計算中か失敗）— スキップ")
+        return []
     return found
 
 
@@ -109,8 +139,7 @@ def merge_label(label: str, outdir: str, *, force: bool = False) -> str | None:
     """1 ケース分を結合して書き出す。書いたパスを返す（対象が無ければ None）。"""
     sources = source_paths(label, outdir)
     if not sources:
-        print(f"  {label}: 元ファイルが見つからない — スキップ")
-        return None
+        return None                     # 理由は source_paths が表示済み
 
     base_labels, blocks = None, []
     for kind, offset, title, path in sources:
@@ -180,7 +209,7 @@ def merge_label(label: str, outdir: str, *, force: bool = False) -> str | None:
 
 def discover_labels(outdir: str) -> list[str]:
     """output/ にある co2removal_*_{種別}.xlsx からケースラベルを拾う。"""
-    kinds = "|".join(k for k, _o, _t in BLOCKS)
+    kinds = "|".join(ALL_KINDS)
     pat = re.compile(rf"^co2removal_(.+)_({kinds})\.xlsx$")
     labels = {m.group(1) for f in glob.glob(os.path.join(outdir, "co2removal_*.xlsx"))
               if (m := pat.match(os.path.basename(f)))}
