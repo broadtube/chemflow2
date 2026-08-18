@@ -65,8 +65,8 @@ from openpyxl.utils import get_column_letter
 
 OUT = os.path.join(os.path.dirname(__file__), "output")
 
-#: 結合対象になりうる全種別（ラベル探索用）
-ALL_KINDS = ("reformer", "plant3", "caustic")
+#: 結合対象になりうる全種別（ラベル探索用）。plant3 版と plant4 版で後段が変わる。
+ALL_KINDS = ("reformer", "plant3", "plant4", "caustic")
 
 
 def block_plan(label: str) -> list[tuple[str, int, str]]:
@@ -75,28 +75,38 @@ def block_plan(label: str) -> list[tuple[str, int, str]]:
     列の並びは**プロセスの流れ**に合わせる。吸収塔の位置がケースで変わるため、
     順序を固定にはできない:
 
-        baseline    改質器(100) → plant3(300)
-        a_upstream  改質器(100) → T-100 吸収塔(200) → plant3(300)
-        b_recycle   改質器(100) → plant3(300) → T-101 吸収塔(400)
+        baseline      改質器(100) → プラント(300)
+        a_upstream    改質器(100) → T-100 吸収塔(200) → プラント(300)
+        b_recycle     改質器(100) → プラント(300) → T-101 吸収塔(400)
+        c_interstage  改質器(100) → プラント(300) → T-102 吸収塔(400)   ← plant4 のみ
 
     100 番刻みなのは、1 ブロックのストリームが増えても衝突しないため。
     桁を見れば結合シートだけで出どころが分かる。
 
-    ⚠ b_recycle の T-101 は厳密には plant3 の**途中**（凝縮器 ⑤CondGas と
-    パージ分岐の間、出口が ⑬ScrubbedGas）にある。そこに列を割り込ませると
-    plant3 の番号が飛んで読みにくくなるので、末尾に置いたうえで**帯の表示名に
+    後段が plant3 か plant4 かは**ラベルの "p4_" 接頭辞**で判別する
+    （example_co2_removal_plant4.py が付ける）。
+
+    ⚠ (b)/(c) の吸収塔は厳密にはプラントの**途中**にある。そこに列を割り込ませると
+    プラント側の番号が飛んで読みにくくなるので、末尾に置いたうえで**帯の表示名に
     位置を書く**という妥協にしてある。
     """
+    is_p4 = label.startswith("p4_")
     reformer = ("reformer", 100, "改質器 (pattern1)")
-    plant3 = ("plant3", 300, "MA プラント (plant3)")
+    plant = (("plant4", 300, "MA プラント (plant4: 2段反応器)") if is_p4
+             else ("plant3", 300, "MA プラント (plant3)"))
     if "a_upstream" in label:
+        dst = "plant4①Steam1" if is_p4 else "plant3①Steam1"
         return [reformer,
-                ("caustic", 200, "苛性ソーダ吸収塔 T-100（改質器⑥DryGas → plant3①Steam1 の間）"),
-                plant3]
+                ("caustic", 200, f"苛性ソーダ吸収塔 T-100（改質器⑥DryGas → {dst} の間）"),
+                plant]
     if "b_recycle" in label:
-        return [reformer, plant3,
-                ("caustic", 400, "苛性ソーダ吸収塔 T-101（plant3 の⑤CondGas → ⑬ScrubbedGas の間）")]
-    return [reformer, plant3]           # baseline は吸収塔なし
+        pos = ("plant4 の⑪Cond2Gas → ⑰ScrubbedGas の間" if is_p4
+               else "plant3 の⑤CondGas → ⑬ScrubbedGas の間")
+        return [reformer, plant, ("caustic", 400, f"苛性ソーダ吸収塔 T-101（{pos}）")]
+    if "c_interstage" in label:      # plant4 のみ: 段間（Cond1Gas → R2）
+        return [reformer, plant,
+                ("caustic", 400, "苛性ソーダ吸収塔 T-102（plant4 の④Cond1Gas → R2 の間）")]
+    return [reformer, plant]            # baseline は吸収塔なし
 
 
 def source_paths(label: str, outdir: str) -> list[tuple[str, int, str, str]]:
