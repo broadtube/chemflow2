@@ -61,9 +61,56 @@ V = NTU·G/(k_G a·P)、Hatta 数による律速域の確認、実験規模の�
 結論だけ言うと、本件の規模では必要充填体積は数十 mL のオーダーで、**塔の寸法を実際に
 決めるのは物質移動ではなく濡れ性・液分散・耐圧**のほう。
 
-実行: PYTHONPATH=.:../reaction_rate/src python3 examples/example_co2_removal.py
-      PYTHONPATH=... python3 examples/example_co2_removal.py --eta 0.9 --cases a,b
-要 Cantera（改質器）と reaction_rate（速度論反応器）。plant3 は 1 ケース約 10 分。
+────────────────────────────────────────────────────────────────────────
+実行方法
+────────────────────────────────────────────────────────────────────────
+要 Cantera（改質器）と reaction_rate（速度論反応器）。
+PYTHONPATH の "." は examples.example_plant3 を絶対 import するため、
+"../reaction_rate/src" は速度論 PFR のため。**どちらも必須**。
+
+■ 総当たり（改質条件 4 種 × 除去位置 2 種 × η 3 点 = 28 runs, 約 5 時間）
+
+    PYTHONPATH=.:../reaction_rate/src python3 -u examples/example_co2_removal.py --reform A_base   --cases baseline,a_upstream,b_recycle --eta 0.5,0.9,0.99
+    PYTHONPATH=.:../reaction_rate/src python3 -u examples/example_co2_removal.py --reform B_900C   --cases baseline,a_upstream,b_recycle --eta 0.5,0.9,0.99
+    PYTHONPATH=.:../reaction_rate/src python3 -u examples/example_co2_removal.py --reform C_03MPaG --cases baseline,a_upstream,b_recycle --eta 0.5,0.9,0.99
+    PYTHONPATH=.:../reaction_rate/src python3 -u examples/example_co2_removal.py --reform D_01MPaG --cases baseline,a_upstream,b_recycle --eta 0.5,0.9,0.99
+
+    python3 examples/merge_xlsx.py --all     # 最後に 3 つの xlsx を 1 つに結合
+
+**改質条件ごとに 4 回に分けるのは仕様**。--reform は 1 条件しか取らない。
+1 回の比較の中で改質条件を固定しないと「改質条件を変えた効果」と「除去位置の
+効果」が混ざって読めなくなるため（BASE_CASE のコメント参照）。
+
+■ 手早く 1 条件だけ（baseline + (a) + (b) を η=0.9 で = 3 runs, 約 30 分）
+
+    PYTHONPATH=.:../reaction_rate/src python3 -u examples/example_co2_removal.py --eta 0.9
+
+■ 引数
+
+    --reform     A_base / B_900C / C_03MPaG / D_01MPaG（既定 A_base）
+                 example_pattern1_plant3.CASES のキーそのまま。T と圧力が名前に入る。
+                 誤った名前は有効値を列挙して落ちるので、黙って変な結果にはならない。
+    --cases      baseline / a_upstream / b_recycle をカンマ区切り
+                 （既定は 3 つとも。baseline は η に依らないので 1 回だけ回る）
+    --eta        CO2 除去率。カンマ区切りで複数指定すると η スイープ
+    --purge      パージ率（既定 0.05）
+    --retry-tol  1 回目が収束判定を外したときの緩和 solve_tol（既定 1e-5）
+
+■ 出力（examples/output/）
+
+    co2removal_{改質条件}_{ケース}_eta{η}_reformer.xlsx / .html
+    co2removal_{改質条件}_{ケース}_eta{η}_plant3.xlsx   / .html
+    co2removal_{改質条件}_{ケース}_eta{η}_caustic.xlsx  / .html
+    co2removal_{改質条件}_{ケース}_eta{η}_merged.xlsx   ← merge_xlsx.py が作る
+
+xlsx は 3 つとも MERGE_BASIS / MERGE_COMPONENTS で行構造を揃えてあるので、
+merge_xlsx.py が列を連結するだけで 1 枚のストリーム表になる。html は Mermaid 図。
+
+■ 所要時間の目安（実測）
+
+plant3 は 1 run 6〜18 分（収束の渋いケースで最長 50 分超）。28 runs で約 5 時間。
+改質器と吸収塔サブフローシートは一瞬なので、時間はすべて plant3 の循環求解。
+1 ケースが収束判定を外しても自動で 1 回だけ緩和再試行するので、途中で止まらない。
 """
 
 import argparse
