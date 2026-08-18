@@ -30,6 +30,19 @@ def _all_formulas(streams: list[Stream]) -> list[str]:
     return list(seen)
 
 
+def _resolve_formulas(streams: list[Stream], components) -> list[str]:
+    """出力する成分行を決める。
+
+    components=None（既定）なら渡されたストリームの和集合（挿入順）。
+    明示すると **集合と順序の両方**を固定できる。複数のフローシートを同じ行構造で
+    書き出して後から列結合したいとき（examples/merge_xlsx.py）に要る。
+    ストリームに無い成分は 0 として出る（flow_of が 0.0 を返すため）。
+    """
+    if components is None:
+        return _all_formulas(streams)
+    return list(components)
+
+
 def _total_mass(stream: Stream) -> float:
     mws = np.array([c.mw for c in stream.components])
     return float(np.sum(stream.molar_flows * mws))
@@ -68,15 +81,16 @@ def _formula_maps(formulas: list[str]):
     return (np.array([c.mw for c in comps]), np.array([c.normal_volume for c in comps]))
 
 
-def stream_table(streams: list[Stream], basis="mol") -> str:
+def stream_table(streams: list[Stream], basis="mol", *, components=None) -> str:
     """成分 × ストリームの表を文字列で返す。
 
     basis: "mol"（既定）/"mass"/"normal_volume"/"mole_frac"/"mass_frac"/"volume_frac"、
     もしくはそれらのリスト（複数セクションを重ねる）。
+    components: 成分行を明示指定する（既定 None = 渡されたストリームの和集合）。
     """
     bases = _as_bases(basis)
     streams = _ordered(streams)
-    formulas = _all_formulas(streams)
+    formulas = _resolve_formulas(streams, components)
     mw, nv = _formula_maps(formulas)
     headers = [s.name or f"S{i}" for i, s in enumerate(streams)]
 
@@ -102,13 +116,16 @@ def stream_table(streams: list[Stream], basis="mol") -> str:
     return "\n".join(lines)
 
 
-def to_csv(streams: list[Stream], path: str, basis="mol") -> None:
-    """成分 × ストリームの値を CSV 出力する（先頭列に basis の単位を付す）。"""
+def to_csv(streams: list[Stream], path: str, basis="mol", *, components=None) -> None:
+    """成分 × ストリームの値を CSV 出力する（先頭列に basis の単位を付す）。
+
+    components: 成分行を明示指定する（既定 None = 渡されたストリームの和集合）。
+    """
     import csv
 
     bases = _as_bases(basis)
     streams = _ordered(streams)
-    formulas = _all_formulas(streams)
+    formulas = _resolve_formulas(streams, components)
     mw, nv = _formula_maps(formulas)
     names = [s.name or f"S{i}" for i, s in enumerate(streams)]
 

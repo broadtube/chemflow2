@@ -107,6 +107,27 @@ CAUSTIC = Reaction({"CO2": -1, "NaOH": -2, "Na2CO3": 1, "H2O": 1},
                    name="CO2 + 2NaOH -> Na2CO3 + H2O")
 
 
+#: 3 つのフローシート（改質器 / 吸収塔 / plant3）の出力で**共通に使う成分行**。
+#: 全フローシートの成分の和集合（13）を、軽質ガス → 含酸素 → 液/塩 の順に並べたもの。
+#: これを to_excel(components=...) に渡すと **集合も順序も**固定されるので、
+#: 3 ファイルの行構造が完全に一致し、merge_xlsx.py が列を連結するだけで済む。
+#:
+#: ⚠ Stream 側には持たせない。chemflow2 では流量ゼロの成分も変数 1 個 + 式 1 本を
+#: 生むので、計算に寄与しないまま問題サイズだけ膨らむ（plant3 は 121 変数・約10分）。
+#: あくまで**出力層だけ**の話。
+MERGE_COMPONENTS = [
+    "H2", "CO", "CO2", "CH4", "N2", "H2O",
+    "CH3OH", "CH3OCH3", "CH3COOCH3", "CH3CHO", "CH3COOH",
+    "NaOH", "Na2CO3",
+]
+
+#: 同じ理由で basis も 3 ファイル共通にする。to_excel は "mass" が bases に無いときだけ
+#: 質量閉包行を足すので、揃えておけばその行の有無も自動で揃う。
+#: 注: normal_volume は液ストリームでは物理的に無意味だが、既存の plant3 出力でも
+#: 同じなので新たな問題ではない。
+MERGE_BASIS = ["mol", "mole_frac", "mass", "normal_volume"]
+
+
 def sheet_name(name: str) -> str:
     """Excel のシート名は 31 文字まで。超える分は頭から詰める。
 
@@ -191,7 +212,8 @@ def report_caustic(label: str, gas_in: dict[str, float], eta: float, *, name: st
           f"({CAUSTIC.element_balance()})")
 
     to_excel(problem.streams, os.path.join(OUT, f"co2removal_{label}_caustic.xlsx"),
-             sheet=sheet_name(f"{label}_caustic"), basis=["mol", "mole_frac", "mass"])
+             sheet=sheet_name(f"{label}_caustic"),
+             basis=MERGE_BASIS, components=MERGE_COMPONENTS)
     export_mermaid(problem, os.path.join(OUT, f"co2removal_{label}_caustic.html"),
                    title=f"{name} NaOH scrubber ({label}, eta={eta:.0%})", style="diamond")
     return Spent
@@ -216,7 +238,8 @@ def run_case(tag: str, eta: float, purge: float, reform: dict, label: str,
     print(f"改質器: H2O={H2Of.flow_of('H2O'):.4f} CO2供給={CO2f.flow_of('CO2'):.4f} mol/h")
     print(stream_table(rp.streams, basis=["mol", "mole_frac"]))
     to_excel(rp.streams, os.path.join(OUT, f"co2removal_{label}_reformer.xlsx"),
-             sheet=sheet_name(f"{label}_reformer"), basis=["mol", "mole_frac"])
+             sheet=sheet_name(f"{label}_reformer"),
+             basis=MERGE_BASIS, components=MERGE_COMPONENTS)
     export_mermaid(rp, os.path.join(OUT, f"co2removal_{label}_reformer.html"),
                    title=f"Reformer + CO2 removal ({label})", style="diamond")
 
@@ -235,7 +258,8 @@ def run_case(tag: str, eta: float, purge: float, reform: dict, label: str,
     Purge, MA = by_name["7. Purge"], by_name["9. MethylAcetate"]
     print(stream_table(problem.streams, basis=["mol", "mole_frac"]))
     to_excel(problem.streams, os.path.join(OUT, f"co2removal_{label}_plant3.xlsx"),
-             sheet=sheet_name(f"{label}_plant3"), basis=["mol", "mole_frac", "mass", "normal_volume"])
+             sheet=sheet_name(f"{label}_plant3"),
+             basis=MERGE_BASIS, components=MERGE_COMPONENTS)
     export_mermaid(problem, os.path.join(OUT, f"co2removal_{label}_plant3.html"),
                    title=f"plant3 + CO2 removal ({label})", style="diamond")
 

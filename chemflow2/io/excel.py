@@ -15,6 +15,7 @@ from chemflow2.core.stream import Stream
 from chemflow2.io.table import (
     _UNITS,
     _all_formulas,
+    _resolve_formulas,
     _as_bases,
     _formula_maps,
     _ordered,
@@ -23,7 +24,8 @@ from chemflow2.io.table import (
 )
 
 
-def to_excel(streams: list[Stream], path: str, *, sheet: str = "Streams", basis="mol") -> None:
+def to_excel(streams: list[Stream], path: str, *, sheet: str = "Streams", basis="mol",
+             components=None) -> None:
     """成分 × ストリームの流量表を .xlsx として書き出す。
 
     レイアウト:
@@ -33,6 +35,9 @@ def to_excel(streams: list[Stream], path: str, *, sheet: str = "Streams", basis=
 
     basis: "mol"（既定）/"mass"/"normal_volume"/"mole_frac"/"mass_frac"/"volume_frac"、
     もしくはそれらのリスト。
+    components: 成分行を明示指定する（既定 None = 渡されたストリームの和集合）。
+        **集合と順序の両方**が固定されるので、複数のフローシートを同じ行構造で
+        書き出して後から列結合できる（examples/merge_xlsx.py がこれを使う）。
     """
     try:
         from openpyxl import Workbook
@@ -42,7 +47,7 @@ def to_excel(streams: list[Stream], path: str, *, sheet: str = "Streams", basis=
 
     bases = _as_bases(basis)
     streams = _ordered(streams)
-    formulas = _all_formulas(streams)
+    formulas = _resolve_formulas(streams, components)
     mw, nv = _formula_maps(formulas)
     names = [s.name or f"S{i}" for i, s in enumerate(streams)]
 
