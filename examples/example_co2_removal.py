@@ -133,7 +133,14 @@ PYTHONPATH の "." は examples.example_plant3 を絶対 import するため、
                  （既定は 3 つとも。baseline は η に依らないので 1 回だけ回る）
     --eta        CO2 除去率。カンマ区切りで複数指定すると η スイープ
     --purge      パージ率（既定 0.05）
+    --solve-tol  Problem.solve の残差ノルム判定（既定 1e-6）
     --retry-tol  1 回目が収束判定を外したときの緩和 solve_tol（既定 1e-5）
+
+⚠ solve_tol は残差ノルムの**絶対値**なのでスケール依存。流量 50 mol/h 規模の
+本問題では既定の 1e-6 は相対 2e-8 に相当し、かなり厳しい（plant4 版は既定 1e-4 で、
+「PFR の積分誤差で残差は 3e-6 で頭打ちになる」というコメント付き）。
+**特定のケースだけ何十分も返ってこないときは、まず --solve-tol 1e-4 を試すこと。**
+収束判定を外して自動再試行に入ると時間が倍になるが、最初から緩めておけば 1 回で済む。
 
 ■ 出力（examples/output/）
 
@@ -392,6 +399,11 @@ def main():
                     help=f"土台にする改質条件（{'/'.join(pp.CASES)}）")
     ap.add_argument("--purge", type=float, default=p3.PURGE,
                     help=f"パージ率（既定 {p3.PURGE}）")
+    ap.add_argument("--solve-tol", type=float, default=1e-6,
+                    help="Problem.solve の残差ノルム判定（既定 1e-6）。**絶対値**なので"
+                         "スケール依存で、流量 50 mol/h 規模の本問題では 1e-6 は相対 2e-8 に"
+                         "相当し厳しい。収束に時間がかかるケースは 1e-5〜1e-4 で回すとよい"
+                         "（plant4 版は既定 1e-4）")
     ap.add_argument("--retry-tol", type=float, default=1e-5,
                     help="1 回目が収束判定を外したときに使う緩和 solve_tol（既定 1e-5）")
     args = ap.parse_args()
@@ -414,7 +426,7 @@ def main():
                 plan.append((tag, eta, f"{args.reform}_{tag}_eta{eta:g}"))
 
     print(f"実行計画: {len(plan)} runs（plant3 は 1 run 約 10 分 → 約 "
-          f"{len(plan) * 10} 分）")
+          f"{len(plan) * 10} 分, solve_tol={args.solve_tol:g}）")
     for _tag, eta, label in plan:
         print(f"  - {label}  η={eta:.0%}")
 
@@ -429,7 +441,8 @@ def main():
     for i, (tag, eta, label) in enumerate(plan, 1):
         t0 = time.time()
         try:
-            results[label] = run_case(tag, eta, args.purge, reform, label)
+            results[label] = run_case(tag, eta, args.purge, reform, label,
+                                      solve_tol=args.solve_tol)
             print(f"[{i}/{len(plan)}] {label} 完了 ({time.time() - t0:.0f}s)")
         except Exception as e:                      # noqa: BLE001 — 打ち切らず続行
             print(f"[{i}/{len(plan)}] {label} 1回目失敗: {type(e).__name__}: {e}")
