@@ -192,7 +192,8 @@ RECYCLE_GUESS = 6.5
 def solve_with_sv(max_outer: int = 8, tol: float = 1e-4, verbose: bool = True,
                   feed: dict[str, float] | None = None,
                   co2_removal: float | None = None, purge: float = PURGE,
-                  solve_tol: float = 1e-6, progress_every: int = 0):
+                  solve_tol: float = 1e-6, progress_every: int = 0,
+                  stop_at_tol: bool = False, solver_tols: float = 1e-12):
     """SV 一定（反応器入口基準）になるまで触媒体積 V を外側反復して解く。
 
     g(V) = volume_for(反応器入口流量(V)) − V の零点を**割線法**で探す。
@@ -202,6 +203,14 @@ def solve_with_sv(max_outer: int = 8, tol: float = 1e-4, verbose: bool = True,
     co2_removal / purge は build() にそのまま渡す（除去位置 (b) 用）。
 
     progress_every > 0 で、残差評価 N 回ごとに進捗を表示する（長い無音を避ける）。
+
+    stop_at_tol=True にすると **‖residual‖ が solve_tol を下回った時点で打ち切る**。
+    合否判定が resid_norm < solve_tol である以上、満たした瞬間に止めるのが理にかなう。
+    既定 False は従来どおり solver_tols まで走り切ってから判定する。
+
+    solver_tols は least_squares の ftol/xtol/gtol に一括で入る（既定 1e-12）。
+    **実行時間を実際に決めているのはこれ**で、solve_tol ではない。1e-12 は
+    「限界まで粘れ」という指定なので、合格ラインをとうに下回っても走り続ける。
 
     solve_tol は Problem.solve の収束判定に使う **残差ノルムの絶対値**（既定 1e-6）。
     絶対値なのでスケール依存で、流量が 50 mol/h 規模の本問題では 1e-6 は相対 2e-8 に
@@ -219,7 +228,8 @@ def solve_with_sv(max_outer: int = 8, tol: float = 1e-4, verbose: bool = True,
             print("自由度 (変数, 方程式):", problem.degrees_of_freedom())
         sol = problem.solve(bounds=(0, np.inf), tol=solve_tol,
                             progress_every=progress_every, progress_label=f"外側{it}",
-                            ftol=1e-12, xtol=1e-12, gtol=1e-12)
+                            stop_at_tol=stop_at_tol,
+                            ftol=solver_tols, xtol=solver_tols, gtol=solver_tols)
         if not sol.success:
             raise RuntimeError(f"外側反復 {it} で収束せず: {sol}")
         n_in = float(streams[1].total_flow.eval())

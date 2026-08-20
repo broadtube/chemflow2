@@ -238,7 +238,8 @@ def solve_with_sv(max_outer: int = 10, tol: float = 1e-4, verbose: bool = True,
         # になる。1e-4 mol/h は流量 60 mol/h に対して相対 2e-6 で、十分すぎる精度。
         sol = problem.solve(bounds=(0, np.inf), tol=solve_tol,
                             progress_every=progress_every, progress_label=f"外側{it}",
-                            ftol=1e-12, xtol=1e-12, gtol=1e-12)
+                            stop_at_tol=stop_at_tol,
+                            ftol=solver_tols, xtol=solver_tols, gtol=solver_tols)
         if not sol.success:
             raise RuntimeError(f"外側反復 {it} で収束せず: {sol}")
         n1 = float(streams[1].total_flow.eval())    # ReactorIn

@@ -150,21 +150,21 @@ PYTHONPATH の "." は examples.* を絶対 import するため、"../reaction_r
 ■ まず向きを見る（除去なし + (b) + (c) を η=0.9 で = 3 runs）
 
     PYTHONPATH=.:../reaction_rate/src python3 -u examples/example_co2_removal_plant4.py \
-        --cases baseline,b_recycle,c_interstage --eta 0.9 --solve-tol 1e-4
+        --cases baseline,b_recycle,c_interstage --eta 0.9 --solve-tol 1e-4 --stop-at-tol
 
 ■ 総当たり（改質条件 4 種 × 除去位置 3 種 × η 3 点 = 40 runs）
 
-    PYTHONPATH=.:../reaction_rate/src python3 -u examples/example_co2_removal_plant4.py --reform A_base   --cases baseline,a_upstream,b_recycle,c_interstage --eta 0.5,0.9,0.99 --solve-tol 1e-4
-    PYTHONPATH=.:../reaction_rate/src python3 -u examples/example_co2_removal_plant4.py --reform B_900C   --cases baseline,a_upstream,b_recycle,c_interstage --eta 0.5,0.9,0.99 --solve-tol 1e-4
-    PYTHONPATH=.:../reaction_rate/src python3 -u examples/example_co2_removal_plant4.py --reform C_03MPaG --cases baseline,a_upstream,b_recycle,c_interstage --eta 0.5,0.9,0.99 --solve-tol 1e-4
-    PYTHONPATH=.:../reaction_rate/src python3 -u examples/example_co2_removal_plant4.py --reform D_01MPaG --cases baseline,a_upstream,b_recycle,c_interstage --eta 0.5,0.9,0.99 --solve-tol 1e-4
+    PYTHONPATH=.:../reaction_rate/src python3 -u examples/example_co2_removal_plant4.py --reform A_base   --cases baseline,a_upstream,b_recycle,c_interstage --eta 0.5,0.9,0.99 --solve-tol 1e-4 --stop-at-tol
+    PYTHONPATH=.:../reaction_rate/src python3 -u examples/example_co2_removal_plant4.py --reform B_900C   --cases baseline,a_upstream,b_recycle,c_interstage --eta 0.5,0.9,0.99 --solve-tol 1e-4 --stop-at-tol
+    PYTHONPATH=.:../reaction_rate/src python3 -u examples/example_co2_removal_plant4.py --reform C_03MPaG --cases baseline,a_upstream,b_recycle,c_interstage --eta 0.5,0.9,0.99 --solve-tol 1e-4 --stop-at-tol
+    PYTHONPATH=.:../reaction_rate/src python3 -u examples/example_co2_removal_plant4.py --reform D_01MPaG --cases baseline,a_upstream,b_recycle,c_interstage --eta 0.5,0.9,0.99 --solve-tol 1e-4 --stop-at-tol
 
     python3 examples/merge_xlsx.py --all     # 最後に 3 つの xlsx を 1 つに結合
 
 Windows (cmd) はこう:
 
     set PYTHONPATH=.;..\reaction_rate\src
-    python -u examples\example_co2_removal_plant4.py --reform A_base --cases baseline,a_upstream,b_recycle,c_interstage --eta 0.5,0.9,0.99 --solve-tol 1e-4
+    python -u examples\example_co2_removal_plant4.py --reform A_base --cases baseline,a_upstream,b_recycle,c_interstage --eta 0.5,0.9,0.99 --solve-tol 1e-4 --stop-at-tol
 
 改質条件ごとに分けるのは仕様（1 回の比較の中で固定しないと「改質条件の効果」と
 「除去位置の効果」が混ざる）。plant3 版と同じ理由。
@@ -241,7 +241,8 @@ CASES = {
 
 
 def run_case(tag: str, eta: float, purge: float, reform: dict, label: str,
-             solve_tol: float = 1e-4) -> dict:
+             solve_tol: float = 1e-4, progress_every: int = 0,
+             stop_at_tol: bool = False, solver_tols: float = 1e-12) -> dict:
     """1 ケース解いて、改質側 + plant4 側の指標を返す。"""
     use_upstream, position, tower, title = CASES[tag]
     print(f"\n{'=' * 78}\n=== {label}  {title}（η={eta:.0%}, パージ率={purge:.0%}）"
@@ -268,7 +269,8 @@ def run_case(tag: str, eta: float, purge: float, reform: dict, label: str,
     plant_removal = None if tag in ("baseline", "a_upstream") else eta
     problem, streams, v = p4.solve_with_sv(
         feed=feed, co2_removal=plant_removal, co2_position=position,
-        purge=purge, solve_tol=solve_tol)
+        purge=purge, solve_tol=solve_tol, progress_every=progress_every,
+        stop_at_tol=stop_at_tol, solver_tols=solver_tols)
 
     by = {s.name: s for s in problem.streams}
     Steam1, ReactorIn = by[S_FEED], by[S_REACTOR_IN]
@@ -334,6 +336,21 @@ def main():
                     help=f"土台にする改質条件（{'/'.join(pp.CASES)}）")
     ap.add_argument("--purge", type=float, default=p4.PURGE,
                     help=f"パージ率（既定 {p4.PURGE}）")
+    ap.add_argument("--progress-every", type=int, default=200,
+                    help="残差評価 N 回ごとに進捗を表示（既定 200、0 で無効）。"
+                         "1 回の求解が数十分かかることがあり、無音だと計算中か"
+                         "固まったか判別できないため")
+    ap.add_argument("--stop-at-tol", action="store_true",
+                    help="‖residual‖ が --solve-tol を下回った時点で打ち切る。"
+                         "合否判定を満たした瞬間に止めるので、合格ラインをとうに"
+                         "下回ってから延々と粘る無駄が無くなる（実測 7〜8 倍速）")
+    ap.add_argument("--solver-tols", type=float, default=1e-12,
+                    help="least_squares の ftol/xtol/gtol に一括で入れる値（既定 1e-12）。"
+                         "**実行時間を実際に決めているのはこれ**")
+    ap.add_argument("--solve-tol", type=float, default=1e-4,
+                    help="Problem.solve の残差ノルム判定（既定 1e-4）。**絶対値**なので"
+                         "スケール依存。plant4 は PFR の積分誤差で残差が 3e-6 で"
+                         "頭打ちになるため 1e-6 のような厳しい値には到達できない")
     ap.add_argument("--retry-tol", type=float, default=1e-3,
                     help="1 回目が収束判定を外したときの緩和 solve_tol（既定 1e-3）")
     args = ap.parse_args()
@@ -369,14 +386,21 @@ def main():
     for i, (tag, eta, label) in enumerate(plan, 1):
         t0 = time.time()
         try:
-            results[label] = run_case(tag, eta, args.purge, reform, label)
+            results[label] = run_case(tag, eta, args.purge, reform, label,
+                                      solve_tol=args.solve_tol,
+                                      progress_every=args.progress_every,
+                                      stop_at_tol=args.stop_at_tol,
+                                      solver_tols=args.solver_tols)
             print(f"[{i}/{len(plan)}] {label} 完了 ({time.time() - t0:.0f}s)")
         except Exception as e:                      # noqa: BLE001 — 打ち切らず続行
             print(f"[{i}/{len(plan)}] {label} 1回目失敗: {type(e).__name__}: {e}")
             print(f"    → solve_tol を {args.retry_tol:g} に緩めて再試行")
             try:
                 results[label] = run_case(tag, eta, args.purge, reform, label,
-                                          solve_tol=args.retry_tol)
+                                          solve_tol=args.retry_tol,
+                                          progress_every=args.progress_every,
+                                          stop_at_tol=args.stop_at_tol,
+                                          solver_tols=args.solver_tols)
                 retried.append(label)
                 print(f"[{i}/{len(plan)}] {label} 完了（緩和判定） "
                       f"({time.time() - t0:.0f}s)")

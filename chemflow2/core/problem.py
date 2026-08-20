@@ -26,6 +26,20 @@ from chemflow2.core.unit import Unit
 from chemflow2.core.vle import antoine_water_psat, henry_pa
 
 
+class _EarlyStop(Exception):
+    """残差が目標を下回った時点で least_squares を打ち切るための内部シグナル。
+
+    scipy の least_squares には「‖residual‖ が閾値を下回ったら止める」という停止条件が
+    無い（ftol/xtol/gtol はいずれも**変化量**や**勾配**の判定で、残差の絶対値ではない）。
+    そのため既定では ftol=1e-12 などに達するまで走り切ってから事後判定することになり、
+    合格ラインをとうに下回っても延々と粘る。残差関数から例外を投げて抜けるのが
+    素直な回避策。
+    """
+
+    def __init__(self, x: np.ndarray, r: np.ndarray, nfev: int):
+        self.x, self.r, self.nfev = x, r, nfev
+
+
 class Constraint:
     """名前付きの残差（= 0 になるべき値を返す）。"""
 
@@ -300,8 +314,10 @@ class Problem:
         x0 = self._pack()
         return len(x0), len(self._residuals(x0))
 
-    def _progress_wrapper(self, every: int, label: str | None):
-        """残差評価を every 回ごとに実況する関数を返す（progress_every 用）。
+    def _residual_fn(self, every: int, label: str | None, stop_below: float | None):
+        """残差関数のラッパを返す（進捗表示 + 残差による早期停止）。
+
+        every > 0 なら残差評価を every 回ごとに実況する。
 
         速度論反応器を含むフローシートは 1 回の solve が数十分かかることがあり、
         その間まったく出力が無いと「計算中なのか固まったのか」が判別できない。
@@ -321,17 +337,20 @@ class Problem:
         def wrapped(x):
             r = self._residuals(x)
             state["n"] += 1
-            if state["n"] % every == 0:
+            nrm = float(np.linalg.norm(r))
+            if every > 0 and state["n"] % every == 0:
                 dt = _time.time() - state["t0"]
-                print(f"      {head}nfev={state['n']:6d}  ‖residual‖={np.linalg.norm(r):.3e}"
+                print(f"      {head}nfev={state['n']:6d}  ‖residual‖={nrm:.3e}"
                       f"  経過 {dt / 60:.1f} 分", flush=True)
+            if stop_below is not None and nrm < stop_below:
+                raise _EarlyStop(np.array(x, dtype=float), r, state["n"])
             return r
 
         return wrapped
 
     def solve(self, *, bounds: tuple | None = None, tol: float = 1e-8,
               progress_every: int = 0, progress_label: str | None = None,
-              **kwargs) -> Solution:
+              stop_at_tol: bool = False, **kwargs) -> Solution:
         """連立方程式を解く。
 
         Parameters
@@ -347,6 +366,12 @@ class Problem:
             既定 0（無効）で、従来どおり無音。
         progress_label : str | None
             進捗行の頭に付ける名前（複数の求解を並べたときの識別用）。
+        stop_at_tol : bool
+            True なら **‖residual‖ が tol を下回った時点で打ち切る**。
+            合否判定が ``resid_norm < tol`` である以上、それを満たした瞬間に
+            止めるのが理にかなっている。既定 False（従来どおり ftol/xtol/gtol まで
+            走り切ってから判定）。scipy には残差の絶対値による停止条件が無いため、
+            残差関数から例外を投げる方式で実装している（_EarlyStop 参照）。
         **kwargs
             scipy.optimize.root / least_squares に渡す追加引数。
         """
@@ -359,11 +384,18 @@ class Problem:
             kind = "過剰決定" if n_eq > n_var else "自由度不足"
             raise SolveError(f"{kind}: 変数 {n_var} 個 / 方程式 {n_eq} 個")
 
-        fn = (self._progress_wrapper(progress_every, progress_label)
-              if progress_every > 0 else self._residuals)
+        stop_below = tol if stop_at_tol else None
+        fn = (self._residual_fn(progress_every, progress_label, stop_below)
+              if (progress_every > 0 or stop_below is not None) else self._residuals)
 
         if bounds is not None:
-            res = least_squares(fn, x0, bounds=bounds, **kwargs)
+            try:
+                res = least_squares(fn, x0, bounds=bounds, **kwargs)
+            except _EarlyStop as e:
+                self._unpack(e.x)
+                nrm = float(np.linalg.norm(e.r))
+                return Solution(True, f"‖residual‖={nrm:.2e} (tol を下回ったので早期停止)",
+                                self, e.nfev)
             self._unpack(res.x)
             resid_norm = float(np.linalg.norm(res.fun))
             ok = resid_norm < tol  # status ではなく最終残差そのもので判定
@@ -376,6 +408,11 @@ class Problem:
         for m in methods:
             try:
                 res = root(fn, x0, method=m, **kwargs)
+            except _EarlyStop as e:
+                self._unpack(e.x)
+                nrm = float(np.linalg.norm(e.r))
+                return Solution(True, f"‖residual‖={nrm:.2e} (tol を下回ったので早期停止)",
+                                self, e.nfev)
             except Exception:
                 continue
             last = res

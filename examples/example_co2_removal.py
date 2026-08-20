@@ -109,17 +109,17 @@ PYTHONPATH の "." は examples.example_plant3 を絶対 import するため、
 
 ■ 総当たり（改質条件 4 種 × 除去位置 2 種 × η 3 点 = 28 runs, 約 5 時間）
 
-    PYTHONPATH=.:../reaction_rate/src python3 -u examples/example_co2_removal.py --reform A_base   --cases baseline,a_upstream,b_recycle --eta 0.5,0.9,0.99 --solve-tol 1e-4
-    PYTHONPATH=.:../reaction_rate/src python3 -u examples/example_co2_removal.py --reform B_900C   --cases baseline,a_upstream,b_recycle --eta 0.5,0.9,0.99 --solve-tol 1e-4
-    PYTHONPATH=.:../reaction_rate/src python3 -u examples/example_co2_removal.py --reform C_03MPaG --cases baseline,a_upstream,b_recycle --eta 0.5,0.9,0.99 --solve-tol 1e-4
-    PYTHONPATH=.:../reaction_rate/src python3 -u examples/example_co2_removal.py --reform D_01MPaG --cases baseline,a_upstream,b_recycle --eta 0.5,0.9,0.99 --solve-tol 1e-4
+    PYTHONPATH=.:../reaction_rate/src python3 -u examples/example_co2_removal.py --reform A_base   --cases baseline,a_upstream,b_recycle --eta 0.5,0.9,0.99 --solve-tol 1e-4 --stop-at-tol
+    PYTHONPATH=.:../reaction_rate/src python3 -u examples/example_co2_removal.py --reform B_900C   --cases baseline,a_upstream,b_recycle --eta 0.5,0.9,0.99 --solve-tol 1e-4 --stop-at-tol
+    PYTHONPATH=.:../reaction_rate/src python3 -u examples/example_co2_removal.py --reform C_03MPaG --cases baseline,a_upstream,b_recycle --eta 0.5,0.9,0.99 --solve-tol 1e-4 --stop-at-tol
+    PYTHONPATH=.:../reaction_rate/src python3 -u examples/example_co2_removal.py --reform D_01MPaG --cases baseline,a_upstream,b_recycle --eta 0.5,0.9,0.99 --solve-tol 1e-4 --stop-at-tol
 
     python3 examples/merge_xlsx.py --all     # 最後に 3 つの xlsx を 1 つに結合
 
 Windows (cmd) はこう:
 
     set PYTHONPATH=.;..\reaction_rate\src
-    python -u examples\example_co2_removal.py --reform C_03MPaG --cases baseline,a_upstream,b_recycle --eta 0.5,0.9,0.99 --solve-tol 1e-4
+    python -u examples\example_co2_removal.py --reform C_03MPaG --cases baseline,a_upstream,b_recycle --eta 0.5,0.9,0.99 --solve-tol 1e-4 --stop-at-tol
 
 **`-u` と `--solve-tol 1e-4` を付ける理由:**
 
@@ -128,6 +128,7 @@ Windows (cmd) はこう:
   --solve-tol    既定 1e-6 は残差ノルムの**絶対値**なので、流量 50 mol/h 規模の
                  本問題では相対 2e-8 に相当し厳しすぎる。1e-4 なら相対 2e-6 で
                  精度は十分（plant4 版の既定と同じ）
+  --stop-at-tol  ‖residual‖ が --solve-tol を下回った時点で打ち切る。**実測 7〜8 倍速**
 
 ⚠ **solve_tol は求解そのものを速くしない。** これは合否判定にしか使われず
 （core/problem.py の `ok = resid_norm < tol`）、least_squares の停止条件は
@@ -138,8 +139,28 @@ solve_with_sv がハードコードしている ftol/xtol/gtol=1e-12 のほう�
 
 したがって 1 回目が長いケースでは、solve_tol を緩めても 1 回目は同じだけかかる。
 効くのは「残差が 1e-6 に届かず 1e-4 には収まる」ケースで、そこで再試行を回避できる。
-1 回目自体を速くしたいなら ftol/xtol/gtol を緩める必要があるが、それは解の精度に
-直接効くので既定は変えていない。
+1 回目自体を速くしたいなら --stop-at-tol を使うか、--solver-tols で ftol/xtol/gtol を
+緩める。前者を推奨する（下記）。
+
+**--stop-at-tol の効果（A_base baseline で実測）:**
+
+    条件    時間    V_cat [mL]      MA [mol/h]
+    base    409 s   305.1059    1.0416226491
+    stop     48 s   305.1167    1.0416355106     ← 8.5 倍速
+
+    V_cat 相対差 3.5e-05 / MA 相対差 1.2e-05（5 桁目まで一致）
+
+無駄の構造はこう:
+
+    残差 1e-4（合格ライン）に到達するまで   全体の 12%
+    そこから ftol=1e-12 を目指して粘る区間   全体の 88%   ← --stop-at-tol が削る
+
+    [外側1] nfev=3500  ‖residual‖=1.055e-04  経過 0.7 分  ← ここで止めれば十分
+    [外側1] nfev=6000  ‖residual‖=3.099e-08  経過 1.0 分  ← 既定はここまで走る
+
+3e-08 まで詰めても答えは 5 桁目までしか変わらない。**PFR を rtol=1e-8 で積分している
+以上、それ以上の精度に意味が無い**ため。既存 68 runs の結論は 3〜4 桁で議論しており、
+--stop-at-tol を付けても整合する。
 
 **検算（A_base baseline）:** solve_tol を 1e-6 → 1e-4 にしても解は一致する。
 所要時間も変わらない（上のとおり合否判定にしか使われないため）。
@@ -156,7 +177,7 @@ solve_with_sv がハードコードしている ftol/xtol/gtol=1e-12 のほう�
 
 ■ 手早く 1 条件だけ（baseline + (a) + (b) を η=0.9 で = 3 runs, 約 30 分）
 
-    PYTHONPATH=.:../reaction_rate/src python3 -u examples/example_co2_removal.py --eta 0.9 --solve-tol 1e-4
+    PYTHONPATH=.:../reaction_rate/src python3 -u examples/example_co2_removal.py --eta 0.9 --solve-tol 1e-4 --stop-at-tol
 
 ■ 引数
 
@@ -363,7 +384,8 @@ def report_caustic(label: str, gas_in: dict[str, float], eta: float, *, name: st
 # 3 ケース
 # --------------------------------------------------------------------------- #
 def run_case(tag: str, eta: float, purge: float, reform: dict, label: str,
-             solve_tol: float = 1e-6, progress_every: int = 0) -> dict:
+             solve_tol: float = 1e-6, progress_every: int = 0,
+             stop_at_tol: bool = False, solver_tols: float = 1e-12) -> dict:
     """1 ケース解いて、改質側 + plant3 側の指標を返す。
 
     tag は "baseline" / "a_upstream" / "b_recycle"、label は出力ファイル名の接頭辞。
@@ -393,7 +415,9 @@ def run_case(tag: str, eta: float, purge: float, reform: dict, label: str,
     plant_removal = eta if tag == "b_recycle" else None
     problem, streams, v_tot = p3.solve_with_sv(feed=feed, co2_removal=plant_removal,
                                                purge=purge, solve_tol=solve_tol,
-                                               progress_every=progress_every)
+                                               progress_every=progress_every,
+                                               stop_at_tol=stop_at_tol,
+                                               solver_tols=solver_tols)
     by_name = {s.name: s for s in problem.streams}
     Steam1, ReactorIn = by_name["1. Steam1"], by_name["2. ReactorIn"]
     Purge, MA = by_name["7. Purge"], by_name["9. MethylAcetate"]
@@ -451,6 +475,14 @@ def main():
                     help="残差評価 N 回ごとに進捗を表示（既定 200、0 で無効）。"
                          "1 回の求解が数十分かかることがあり、無音だと計算中か"
                          "固まったか判別できないため")
+    ap.add_argument("--stop-at-tol", action="store_true",
+                    help="‖residual‖ が --solve-tol を下回った時点で打ち切る。"
+                         "合否判定を満たした瞬間に止めるので、合格ラインをとうに"
+                         "下回ってから延々と粘る無駄が無くなる")
+    ap.add_argument("--solver-tols", type=float, default=1e-12,
+                    help="least_squares の ftol/xtol/gtol に一括で入れる値（既定 1e-12）。"
+                         "**実行時間を実際に決めているのはこれ**。1e-12 は「限界まで粘れ」"
+                         "の指定で、合格ラインを下回っても走り続ける")
     ap.add_argument("--solve-tol", type=float, default=1e-6,
                     help="Problem.solve の残差ノルム判定（既定 1e-6）。**絶対値**なので"
                          "スケール依存で、流量 50 mol/h 規模の本問題では 1e-6 は相対 2e-8 に"
@@ -495,7 +527,9 @@ def main():
         try:
             results[label] = run_case(tag, eta, args.purge, reform, label,
                                       solve_tol=args.solve_tol,
-                                      progress_every=args.progress_every)
+                                      progress_every=args.progress_every,
+                                      stop_at_tol=args.stop_at_tol,
+                                      solver_tols=args.solver_tols)
             print(f"[{i}/{len(plan)}] {label} 完了 ({time.time() - t0:.0f}s)")
         except Exception as e:                      # noqa: BLE001 — 打ち切らず続行
             print(f"[{i}/{len(plan)}] {label} 1回目失敗: {type(e).__name__}: {e}")
@@ -503,7 +537,9 @@ def main():
             try:
                 results[label] = run_case(tag, eta, args.purge, reform, label,
                                           solve_tol=args.retry_tol,
-                                          progress_every=args.progress_every)
+                                          progress_every=args.progress_every,
+                                          stop_at_tol=args.stop_at_tol,
+                                          solver_tols=args.solver_tols)
                 retried.append(label)
                 print(f"[{i}/{len(plan)}] {label} 完了（緩和判定） "
                       f"({time.time() - t0:.0f}s)")
