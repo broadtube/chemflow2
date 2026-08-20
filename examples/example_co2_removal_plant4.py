@@ -1,4 +1,4 @@
-"""サンプル: CO2 除去位置の比較 — 後工程を **plant4（2段反応器）** にした版。
+r"""サンプル: CO2 除去位置の比較 — 後工程を **plant4（2段反応器）** にした版。
 
 example_co2_removal.py（後工程 plant3）の plant4 版。共通部分（苛性ソーダ吸収塔の
 サブフローシート・成分行・basis）は例の相互 import で再利用し、**plant4 固有の部分
@@ -150,19 +150,30 @@ PYTHONPATH の "." は examples.* を絶対 import するため、"../reaction_r
 ■ まず向きを見る（除去なし + (b) + (c) を η=0.9 で = 3 runs）
 
     PYTHONPATH=.:../reaction_rate/src python3 -u examples/example_co2_removal_plant4.py \
-        --cases baseline,b_recycle,c_interstage --eta 0.9
+        --cases baseline,b_recycle,c_interstage --eta 0.9 --solve-tol 1e-4
 
 ■ 総当たり（改質条件 4 種 × 除去位置 3 種 × η 3 点 = 40 runs）
 
-    PYTHONPATH=.:../reaction_rate/src python3 -u examples/example_co2_removal_plant4.py --reform A_base   --cases baseline,a_upstream,b_recycle,c_interstage --eta 0.5,0.9,0.99
-    PYTHONPATH=.:../reaction_rate/src python3 -u examples/example_co2_removal_plant4.py --reform B_900C   --cases baseline,a_upstream,b_recycle,c_interstage --eta 0.5,0.9,0.99
-    PYTHONPATH=.:../reaction_rate/src python3 -u examples/example_co2_removal_plant4.py --reform C_03MPaG --cases baseline,a_upstream,b_recycle,c_interstage --eta 0.5,0.9,0.99
-    PYTHONPATH=.:../reaction_rate/src python3 -u examples/example_co2_removal_plant4.py --reform D_01MPaG --cases baseline,a_upstream,b_recycle,c_interstage --eta 0.5,0.9,0.99
+    PYTHONPATH=.:../reaction_rate/src python3 -u examples/example_co2_removal_plant4.py --reform A_base   --cases baseline,a_upstream,b_recycle,c_interstage --eta 0.5,0.9,0.99 --solve-tol 1e-4
+    PYTHONPATH=.:../reaction_rate/src python3 -u examples/example_co2_removal_plant4.py --reform B_900C   --cases baseline,a_upstream,b_recycle,c_interstage --eta 0.5,0.9,0.99 --solve-tol 1e-4
+    PYTHONPATH=.:../reaction_rate/src python3 -u examples/example_co2_removal_plant4.py --reform C_03MPaG --cases baseline,a_upstream,b_recycle,c_interstage --eta 0.5,0.9,0.99 --solve-tol 1e-4
+    PYTHONPATH=.:../reaction_rate/src python3 -u examples/example_co2_removal_plant4.py --reform D_01MPaG --cases baseline,a_upstream,b_recycle,c_interstage --eta 0.5,0.9,0.99 --solve-tol 1e-4
 
     python3 examples/merge_xlsx.py --all     # 最後に 3 つの xlsx を 1 つに結合
 
+Windows (cmd) はこう:
+
+    set PYTHONPATH=.;..\reaction_rate\src
+    python -u examples\example_co2_removal_plant4.py --reform A_base --cases baseline,a_upstream,b_recycle,c_interstage --eta 0.5,0.9,0.99 --solve-tol 1e-4
+
 改質条件ごとに分けるのは仕様（1 回の比較の中で固定しないと「改質条件の効果」と
 「除去位置の効果」が混ざる）。plant3 版と同じ理由。
+
+**`-u` を付ける理由:** 付けないと stdout がブロックバッファになり、リダイレクト時に
+進捗が何も見えなくなる（plant3 版で 52 分間無音になった事例あり）。
+**`--solve-tol` について:** plant4 版はもともと既定 1e-4 なので明示は不要だが、
+plant3 版と揃えて書いてある。1e-6 のような厳しい値にすると収束が渋いケースで
+時間が倍になる（PFR の積分誤差で残差は 3e-6 で頭打ちになるため到達できない）。
 
 ■ 出力（examples/output/）
 

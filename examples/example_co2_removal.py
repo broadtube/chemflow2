@@ -1,4 +1,4 @@
-"""サンプル: 循環系の CO2 希釈を解消する — 除去位置 (a)/(b) の比較。
+r"""サンプル: 循環系の CO2 希釈を解消する — 除去位置 (a)/(b) の比較。
 
 example_pattern1_plant3.py の結論「不活性（CO2+CH4）最小化は MA 生産では裏目」を受けて、
 **改質器への CO2 供給は A_base のまま（= ドライリフォーミングの取り分は捨てない）**、
@@ -109,12 +109,46 @@ PYTHONPATH の "." は examples.example_plant3 を絶対 import するため、
 
 ■ 総当たり（改質条件 4 種 × 除去位置 2 種 × η 3 点 = 28 runs, 約 5 時間）
 
-    PYTHONPATH=.:../reaction_rate/src python3 -u examples/example_co2_removal.py --reform A_base   --cases baseline,a_upstream,b_recycle --eta 0.5,0.9,0.99
-    PYTHONPATH=.:../reaction_rate/src python3 -u examples/example_co2_removal.py --reform B_900C   --cases baseline,a_upstream,b_recycle --eta 0.5,0.9,0.99
-    PYTHONPATH=.:../reaction_rate/src python3 -u examples/example_co2_removal.py --reform C_03MPaG --cases baseline,a_upstream,b_recycle --eta 0.5,0.9,0.99
-    PYTHONPATH=.:../reaction_rate/src python3 -u examples/example_co2_removal.py --reform D_01MPaG --cases baseline,a_upstream,b_recycle --eta 0.5,0.9,0.99
+    PYTHONPATH=.:../reaction_rate/src python3 -u examples/example_co2_removal.py --reform A_base   --cases baseline,a_upstream,b_recycle --eta 0.5,0.9,0.99 --solve-tol 1e-4
+    PYTHONPATH=.:../reaction_rate/src python3 -u examples/example_co2_removal.py --reform B_900C   --cases baseline,a_upstream,b_recycle --eta 0.5,0.9,0.99 --solve-tol 1e-4
+    PYTHONPATH=.:../reaction_rate/src python3 -u examples/example_co2_removal.py --reform C_03MPaG --cases baseline,a_upstream,b_recycle --eta 0.5,0.9,0.99 --solve-tol 1e-4
+    PYTHONPATH=.:../reaction_rate/src python3 -u examples/example_co2_removal.py --reform D_01MPaG --cases baseline,a_upstream,b_recycle --eta 0.5,0.9,0.99 --solve-tol 1e-4
 
     python3 examples/merge_xlsx.py --all     # 最後に 3 つの xlsx を 1 つに結合
+
+Windows (cmd) はこう:
+
+    set PYTHONPATH=.;..\reaction_rate\src
+    python -u examples\example_co2_removal.py --reform C_03MPaG --cases baseline,a_upstream,b_recycle --eta 0.5,0.9,0.99 --solve-tol 1e-4
+
+**`-u` と `--solve-tol 1e-4` を付ける理由:**
+
+  -u             付けないと stdout がブロックバッファになり、リダイレクト時に
+                 進捗が何も見えなくなる（実際に 52 分間無音になった事例あり）
+  --solve-tol    既定 1e-6 は残差ノルムの**絶対値**なので、流量 50 mol/h 規模の
+                 本問題では相対 2e-8 に相当し厳しすぎる。1e-4 なら相対 2e-6 で
+                 精度は十分（plant4 版の既定と同じ）
+
+⚠ **solve_tol は求解そのものを速くしない。** これは合否判定にしか使われず
+（core/problem.py の `ok = resid_norm < tol`）、least_squares の停止条件は
+solve_with_sv がハードコードしている ftol/xtol/gtol=1e-12 のほう。つまり:
+
+    solve_tol を緩める効果 = 「判定を外して自動再試行に入る」のを防ぐ（時間が倍に
+                             なるのを避ける）だけ。1 回目の求解時間は変わらない。
+
+したがって 1 回目が長いケースでは、solve_tol を緩めても 1 回目は同じだけかかる。
+効くのは「残差が 1e-6 に届かず 1e-4 には収まる」ケースで、そこで再試行を回避できる。
+1 回目自体を速くしたいなら ftol/xtol/gtol を緩める必要があるが、それは解の精度に
+直接効くので既定は変えていない。
+
+**検算（A_base baseline）:** solve_tol を 1e-6 → 1e-4 にしても解は一致する。
+所要時間も変わらない（上のとおり合否判定にしか使われないため）。
+
+    指標              記録(1e-6)   今回(1e-4)
+    酢酸メチル [mol/h]   1.0416     1.0416226491
+    全触媒体積 [mL]     305.1059     305.1057
+    反応器入口 [mol/h]   68.0614      68.0614
+    所要時間               338 s        332 s
 
 **改質条件ごとに 4 回に分けるのは仕様**。--reform は 1 条件しか取らない。
 1 回の比較の中で改質条件を固定しないと「改質条件を変えた効果」と「除去位置の
@@ -122,7 +156,7 @@ PYTHONPATH の "." は examples.example_plant3 を絶対 import するため、
 
 ■ 手早く 1 条件だけ（baseline + (a) + (b) を η=0.9 で = 3 runs, 約 30 分）
 
-    PYTHONPATH=.:../reaction_rate/src python3 -u examples/example_co2_removal.py --eta 0.9
+    PYTHONPATH=.:../reaction_rate/src python3 -u examples/example_co2_removal.py --eta 0.9 --solve-tol 1e-4
 
 ■ 引数
 
