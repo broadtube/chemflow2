@@ -300,7 +300,38 @@ class Problem:
         x0 = self._pack()
         return len(x0), len(self._residuals(x0))
 
-    def solve(self, *, bounds: tuple | None = None, tol: float = 1e-8, **kwargs) -> Solution:
+    def _progress_wrapper(self, every: int, label: str | None):
+        """残差評価を every 回ごとに実況する関数を返す（progress_every 用）。
+
+        速度論反応器を含むフローシートは 1 回の solve が数十分かかることがあり、
+        その間まったく出力が無いと「計算中なのか固まったのか」が判別できない。
+        残差評価の回数が実質そのままコスト（PFR 積分の回数）なので、それを刻んで
+        出す。‖residual‖ の推移を見れば収束しつつあるのかも分かる。
+
+        ⚠ ‖residual‖ が階段状に見える（しばらく一定 → 急に下がる）のは正常。
+        least_squares はヤコビアンを差分で作るので、**変数の数だけ同じ点の近傍を
+        評価してから 1 歩進む**（変数 133 個なら約 133 回ごとに 1 段）。値が動かない
+        区間があっても固まっているわけではない。
+        """
+        import time as _time
+
+        state = {"n": 0, "t0": _time.time()}
+        head = f"[{label}] " if label else ""
+
+        def wrapped(x):
+            r = self._residuals(x)
+            state["n"] += 1
+            if state["n"] % every == 0:
+                dt = _time.time() - state["t0"]
+                print(f"      {head}nfev={state['n']:6d}  ‖residual‖={np.linalg.norm(r):.3e}"
+                      f"  経過 {dt / 60:.1f} 分", flush=True)
+            return r
+
+        return wrapped
+
+    def solve(self, *, bounds: tuple | None = None, tol: float = 1e-8,
+              progress_every: int = 0, progress_label: str | None = None,
+              **kwargs) -> Solution:
         """連立方程式を解く。
 
         Parameters
@@ -310,6 +341,12 @@ class Problem:
         tol : float
             収束判定に使う最終残差ノルムの閾値。solver の早期停止フラグではなく、
             実際に ‖residual‖ が十分小さいかを直接確認する。
+        progress_every : int
+            0 より大きいと、残差評価 N 回ごとに nfev・‖residual‖・経過時間を表示する。
+            長時間かかる求解が「進んでいるのか固まったのか」を判別するため。
+            既定 0（無効）で、従来どおり無音。
+        progress_label : str | None
+            進捗行の頭に付ける名前（複数の求解を並べたときの識別用）。
         **kwargs
             scipy.optimize.root / least_squares に渡す追加引数。
         """
@@ -322,8 +359,11 @@ class Problem:
             kind = "過剰決定" if n_eq > n_var else "自由度不足"
             raise SolveError(f"{kind}: 変数 {n_var} 個 / 方程式 {n_eq} 個")
 
+        fn = (self._progress_wrapper(progress_every, progress_label)
+              if progress_every > 0 else self._residuals)
+
         if bounds is not None:
-            res = least_squares(self._residuals, x0, bounds=bounds, **kwargs)
+            res = least_squares(fn, x0, bounds=bounds, **kwargs)
             self._unpack(res.x)
             resid_norm = float(np.linalg.norm(res.fun))
             ok = resid_norm < tol  # status ではなく最終残差そのもので判定
@@ -335,7 +375,7 @@ class Problem:
         last = None
         for m in methods:
             try:
-                res = root(self._residuals, x0, method=m, **kwargs)
+                res = root(fn, x0, method=m, **kwargs)
             except Exception:
                 continue
             last = res

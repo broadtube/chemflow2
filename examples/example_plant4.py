@@ -214,7 +214,8 @@ GAS_FRACTION_GUESS = 0.95    # Cond1 のガス側に残る割合の初期推定
 def solve_with_sv(max_outer: int = 10, tol: float = 1e-4, verbose: bool = True,
                   feed: dict[str, float] | None = None,
                   co2_removal: float | None = None, purge: float = PURGE,
-                  co2_position: str = "recycle", solve_tol: float = 1e-4):
+                  co2_position: str = "recycle", solve_tol: float = 1e-4,
+                  progress_every: int = 0):
     """2つの床がそれぞれ入口基準 SV を満たすまで触媒体積 (V1, V2) を外側反復する。
 
     g(V) = [volume_for(ReactorIn) − V1, volume_for(R2の入口) − V2] の零点を、
@@ -236,6 +237,7 @@ def solve_with_sv(max_outer: int = 10, tol: float = 1e-4, verbose: bool = True,
         # 流量 × 1e-8 程度のノイズ床があり、方程式 165 本ではノルムが ~3e-6 で頭打ち
         # になる。1e-4 mol/h は流量 60 mol/h に対して相対 2e-6 で、十分すぎる精度。
         sol = problem.solve(bounds=(0, np.inf), tol=solve_tol,
+                            progress_every=progress_every, progress_label=f"外側{it}",
                             ftol=1e-12, xtol=1e-12, gtol=1e-12)
         if not sol.success:
             raise RuntimeError(f"外側反復 {it} で収束せず: {sol}")

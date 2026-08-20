@@ -133,6 +133,7 @@ PYTHONPATH の "." は examples.example_plant3 を絶対 import するため、
                  （既定は 3 つとも。baseline は η に依らないので 1 回だけ回る）
     --eta        CO2 除去率。カンマ区切りで複数指定すると η スイープ
     --purge      パージ率（既定 0.05）
+    --progress-every  残差評価 N 回ごとに進捗を表示（既定 200、0 で無効）
     --solve-tol  Problem.solve の残差ノルム判定（既定 1e-6）
     --retry-tol  1 回目が収束判定を外したときの緩和 solve_tol（既定 1e-5）
 
@@ -157,6 +158,18 @@ merge_xlsx.py が列を連結するだけで 1 枚のストリーム表になる
 plant3 は 1 run 6〜18 分（収束の渋いケースで最長 50 分超）。28 runs で約 5 時間。
 改質器と吸収塔サブフローシートは一瞬なので、時間はすべて plant3 の循環求解。
 1 ケースが収束判定を外しても自動で 1 回だけ緩和再試行するので、途中で止まらない。
+
+求解中は --progress-every の刻みでこう出る（無音にならない）:
+
+      [外側1] nfev=   200  ‖residual‖=5.954e+00  経過 1.2 分
+      [外側1] nfev=   400  ‖residual‖=2.117e+00  経過 2.5 分
+      [1] V_cat=... → 反応器入口 ... → V_cat(SV=5000/h)=...   (64.4s, PFR積分 1228回, nfev=62)
+
+‖residual‖ が階段状（しばらく一定 → 急に下がる）なのは正常。least_squares は
+ヤコビアンを差分で作るので、変数 133 個なら約 133 回ごとに 1 歩進む。
+
+⚠ Windows で `python -u` を付けずにリダイレクトすると stdout がブロックバッファに
+なり、この進捗も含めて何も見えなくなる。**必ず -u を付けること。**
 """
 
 import argparse
@@ -316,7 +329,7 @@ def report_caustic(label: str, gas_in: dict[str, float], eta: float, *, name: st
 # 3 ケース
 # --------------------------------------------------------------------------- #
 def run_case(tag: str, eta: float, purge: float, reform: dict, label: str,
-             solve_tol: float = 1e-6) -> dict:
+             solve_tol: float = 1e-6, progress_every: int = 0) -> dict:
     """1 ケース解いて、改質側 + plant3 側の指標を返す。
 
     tag は "baseline" / "a_upstream" / "b_recycle"、label は出力ファイル名の接頭辞。
@@ -345,7 +358,8 @@ def run_case(tag: str, eta: float, purge: float, reform: dict, label: str,
     feed = {f: PlantFeed.flow_of(f) for f in PlantFeed.formulas}
     plant_removal = eta if tag == "b_recycle" else None
     problem, streams, v_tot = p3.solve_with_sv(feed=feed, co2_removal=plant_removal,
-                                               purge=purge, solve_tol=solve_tol)
+                                               purge=purge, solve_tol=solve_tol,
+                                               progress_every=progress_every)
     by_name = {s.name: s for s in problem.streams}
     Steam1, ReactorIn = by_name["1. Steam1"], by_name["2. ReactorIn"]
     Purge, MA = by_name["7. Purge"], by_name["9. MethylAcetate"]
@@ -399,6 +413,10 @@ def main():
                     help=f"土台にする改質条件（{'/'.join(pp.CASES)}）")
     ap.add_argument("--purge", type=float, default=p3.PURGE,
                     help=f"パージ率（既定 {p3.PURGE}）")
+    ap.add_argument("--progress-every", type=int, default=200,
+                    help="残差評価 N 回ごとに進捗を表示（既定 200、0 で無効）。"
+                         "1 回の求解が数十分かかることがあり、無音だと計算中か"
+                         "固まったか判別できないため")
     ap.add_argument("--solve-tol", type=float, default=1e-6,
                     help="Problem.solve の残差ノルム判定（既定 1e-6）。**絶対値**なので"
                          "スケール依存で、流量 50 mol/h 規模の本問題では 1e-6 は相対 2e-8 に"
@@ -442,14 +460,16 @@ def main():
         t0 = time.time()
         try:
             results[label] = run_case(tag, eta, args.purge, reform, label,
-                                      solve_tol=args.solve_tol)
+                                      solve_tol=args.solve_tol,
+                                      progress_every=args.progress_every)
             print(f"[{i}/{len(plan)}] {label} 完了 ({time.time() - t0:.0f}s)")
         except Exception as e:                      # noqa: BLE001 — 打ち切らず続行
             print(f"[{i}/{len(plan)}] {label} 1回目失敗: {type(e).__name__}: {e}")
             print(f"    → solve_tol を {args.retry_tol:g} に緩めて再試行")
             try:
                 results[label] = run_case(tag, eta, args.purge, reform, label,
-                                          solve_tol=args.retry_tol)
+                                          solve_tol=args.retry_tol,
+                                          progress_every=args.progress_every)
                 retried.append(label)
                 print(f"[{i}/{len(plan)}] {label} 完了（緩和判定） "
                       f"({time.time() - t0:.0f}s)")
