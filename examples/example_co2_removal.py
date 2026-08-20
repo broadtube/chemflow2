@@ -119,7 +119,16 @@ PYTHONPATH の "." は examples.example_plant3 を絶対 import するため、
 Windows (cmd) はこう:
 
     set PYTHONPATH=.;..\reaction_rate\src
+    set OMP_NUM_THREADS=1
+    set OPENBLAS_NUM_THREADS=1
     python -u examples\example_co2_removal.py --reform C_03MPaG --cases baseline,a_upstream,b_recycle --eta 0.5,0.9,0.99 --solve-tol 1e-4 --stop-at-tol
+
+**スレッド数を 1 に固定する理由:** least_squares の trust region 計算は内部で行列積を
+使い、**BLAS のスレッド数が変わると浮動小数の加算順序が変わる**。差は 1e-16 オーダー
+だが、本問題はヤコビアンが悪条件（流量が 25 桁にわたる）なので**そこから経路が分岐
+する**。実際、同じコード・同じ入力で Linux(WSL) では 691 秒、Windows Native では
+2 時間コースになりかけた事例がある。スレッド数を固定すると揺らぎが減り、
+環境をまたいだ再現性が上がる。速度も安定する（並列化の恩恵より分岐の害が大きい）。
 
 **`-u` と `--solve-tol 1e-4` を付ける理由:**
 

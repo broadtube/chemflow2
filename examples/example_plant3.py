@@ -193,7 +193,8 @@ def solve_with_sv(max_outer: int = 8, tol: float = 1e-4, verbose: bool = True,
                   feed: dict[str, float] | None = None,
                   co2_removal: float | None = None, purge: float = PURGE,
                   solve_tol: float = 1e-6, progress_every: int = 0,
-                  stop_at_tol: bool = False, solver_tols: float = 1e-12):
+                  stop_at_tol: bool = False, solver_tols: float = 1e-12,
+                  solver_kwargs: dict | None = None):
     """SV 一定（反応器入口基準）になるまで触媒体積 V を外側反復して解く。
 
     g(V) = volume_for(反応器入口流量(V)) − V の零点を**割線法**で探す。
@@ -207,6 +208,12 @@ def solve_with_sv(max_outer: int = 8, tol: float = 1e-4, verbose: bool = True,
     stop_at_tol=True にすると **‖residual‖ が solve_tol を下回った時点で打ち切る**。
     合否判定が resid_norm < solve_tol である以上、満たした瞬間に止めるのが理にかなう。
     既定 False は従来どおり solver_tols まで走り切ってから判定する。
+
+    solver_kwargs は least_squares にそのまま渡す追加引数。例えば
+    ``solver_kwargs={"x_scale": "jac"}`` とすると、scipy がヤコビアン各列の
+    ノルムの逆数から変数ごとのスケールを推定する（Moré 1978）。本問題は流量が
+    25 桁にわたり（46 mol/h 〜 1e-23 mol/h）、既定の x_scale=1.0 では trust region が
+    球のままで、敏感な変数と鈍感な変数を同じ物差しで測ってしまう。
 
     solver_tols は least_squares の ftol/xtol/gtol に一括で入る（既定 1e-12）。
     **実行時間を実際に決めているのはこれ**で、solve_tol ではない。1e-12 は
@@ -229,7 +236,8 @@ def solve_with_sv(max_outer: int = 8, tol: float = 1e-4, verbose: bool = True,
         sol = problem.solve(bounds=(0, np.inf), tol=solve_tol,
                             progress_every=progress_every, progress_label=f"外側{it}",
                             stop_at_tol=stop_at_tol,
-                            ftol=solver_tols, xtol=solver_tols, gtol=solver_tols)
+                            ftol=solver_tols, xtol=solver_tols, gtol=solver_tols,
+                            **(solver_kwargs or {}))
         if not sol.success:
             raise RuntimeError(f"外側反復 {it} で収束せず: {sol}")
         n_in = float(streams[1].total_flow.eval())

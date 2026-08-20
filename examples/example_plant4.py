@@ -239,7 +239,8 @@ def solve_with_sv(max_outer: int = 10, tol: float = 1e-4, verbose: bool = True,
         sol = problem.solve(bounds=(0, np.inf), tol=solve_tol,
                             progress_every=progress_every, progress_label=f"外側{it}",
                             stop_at_tol=stop_at_tol,
-                            ftol=solver_tols, xtol=solver_tols, gtol=solver_tols)
+                            ftol=solver_tols, xtol=solver_tols, gtol=solver_tols,
+                            **(solver_kwargs or {}))
         if not sol.success:
             raise RuntimeError(f"外側反復 {it} で収束せず: {sol}")
         n1 = float(streams[1].total_flow.eval())    # ReactorIn

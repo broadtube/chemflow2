@@ -164,7 +164,12 @@ PYTHONPATH の "." は examples.* を絶対 import するため、"../reaction_r
 Windows (cmd) はこう:
 
     set PYTHONPATH=.;..\reaction_rate\src
+    set OMP_NUM_THREADS=1
+    set OPENBLAS_NUM_THREADS=1
     python -u examples\example_co2_removal_plant4.py --reform A_base --cases baseline,a_upstream,b_recycle,c_interstage --eta 0.5,0.9,0.99 --solve-tol 1e-4 --stop-at-tol
+
+**スレッド数を 1 に固定する理由:** BLAS のスレッド数で浮動小数の加算順序が変わり、
+悪条件な本問題では求解の経路が分岐する。plant3 版の docstring に詳細。
 
 改質条件ごとに分けるのは仕様（1 回の比較の中で固定しないと「改質条件の効果」と
 「除去位置の効果」が混ざる）。plant3 版と同じ理由。
