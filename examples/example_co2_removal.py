@@ -138,6 +138,7 @@ Windows (cmd) はこう:
                  本問題では相対 2e-8 に相当し厳しすぎる。1e-4 なら相対 2e-6 で
                  精度は十分（plant4 版の既定と同じ）
   --stop-at-tol  ‖residual‖ が --solve-tol を下回った時点で打ち切る。**実測 7〜8 倍速**
+  --x-scale      least_squares の x_scale（既定 'jac'）。'1.0' で従来の挙動
 
 ⚠ **solve_tol は求解そのものを速くしない。** これは合否判定にしか使われず
 （core/problem.py の `ok = resid_norm < tol`）、least_squares の停止条件は
@@ -170,6 +171,27 @@ solve_with_sv がハードコードしている ftol/xtol/gtol=1e-12 のほう�
 3e-08 まで詰めても答えは 5 桁目までしか変わらない。**PFR を rtol=1e-8 で積分している
 以上、それ以上の精度に意味が無い**ため。既存 68 runs の結論は 3〜4 桁で議論しており、
 --stop-at-tol を付けても整合する。
+
+**--x-scale jac の効果（既定）:** --stop-at-tol が「合格ライン到達後に粘る尾」を削るのに
+対し、x_scale='jac' は**降下そのもの**を速くする。両者は補完関係にある。
+
+    C_03MPaG b_recycle η0.99（遅いケース）
+      記録        691 s   V_cat 267.9060   MA 0.8767037228
+      stop のみ   545 s   V_cat 267.9039   MA 0.8767028794   1.27x
+      stop+jac    204 s   V_cat 267.9073   MA 0.8766872812   3.38x  ← stop 比 2.67 倍
+
+      外側2  nfev 29080 → 8845（3.3 倍改善）   ← 降下区間そのものが縮む
+      外側3  nfev 22111 → 8444（2.6 倍改善）
+
+    A_base baseline（速いケース）— 悪化しないことの確認
+      stop のみ    44 s   MA 記録との相対差 1.2e-05
+      stop+jac     43 s   MA 記録との相対差 6.8e-06   ← 速度同等、精度はむしろ良い
+
+効く理由: 本問題は流量が 25 桁にわたり（46 mol/h 〜 1.2e-23 mol/h）、収束解では
+182 変数中 126 個が下限 0 に張り付く。既定の x_scale=1.0 は全変数を同じ物差しで測る
+ので、trust region の半径が「大きい変数には細かすぎ、小さい変数には粗すぎ」になる。
+'jac' はヤコビアン各列のノルムの逆数からスケールを推定し（Moré 1978）、trust region を
+問題の感度に合わせた楕円体にする。**収束判定を一切変えない**ので精度は落ちない。
 
 **検算（A_base baseline）:** solve_tol を 1e-6 → 1e-4 にしても解は一致する。
 所要時間も変わらない（上のとおり合否判定にしか使われないため）。
@@ -394,7 +416,8 @@ def report_caustic(label: str, gas_in: dict[str, float], eta: float, *, name: st
 # --------------------------------------------------------------------------- #
 def run_case(tag: str, eta: float, purge: float, reform: dict, label: str,
              solve_tol: float = 1e-6, progress_every: int = 0,
-             stop_at_tol: bool = False, solver_tols: float = 1e-12) -> dict:
+             stop_at_tol: bool = False, solver_tols: float = 1e-12,
+             x_scale: str | float = "jac") -> dict:
     """1 ケース解いて、改質側 + plant3 側の指標を返す。
 
     tag は "baseline" / "a_upstream" / "b_recycle"、label は出力ファイル名の接頭辞。
@@ -426,7 +449,8 @@ def run_case(tag: str, eta: float, purge: float, reform: dict, label: str,
                                                purge=purge, solve_tol=solve_tol,
                                                progress_every=progress_every,
                                                stop_at_tol=stop_at_tol,
-                                               solver_tols=solver_tols)
+                                               solver_tols=solver_tols,
+                                               solver_kwargs={"x_scale": x_scale})
     by_name = {s.name: s for s in problem.streams}
     Steam1, ReactorIn = by_name["1. Steam1"], by_name["2. ReactorIn"]
     Purge, MA = by_name["7. Purge"], by_name["9. MethylAcetate"]
@@ -488,6 +512,12 @@ def main():
                     help="‖residual‖ が --solve-tol を下回った時点で打ち切る。"
                          "合否判定を満たした瞬間に止めるので、合格ラインをとうに"
                          "下回ってから延々と粘る無駄が無くなる")
+    ap.add_argument("--x-scale", default="jac",
+                    help="least_squares の x_scale（既定 'jac'）。'jac' はヤコビアン各列の"
+                         "ノルムの逆数から変数ごとのスケールを推定する（Moré 1978）。"
+                         "本問題は流量が 25 桁にわたるため、既定の 1.0（全変数を同じ"
+                         "物差しで測る）では trust region がうまく働かない。"
+                         "'1.0' を渡すと従来の挙動")
     ap.add_argument("--solver-tols", type=float, default=1e-12,
                     help="least_squares の ftol/xtol/gtol に一括で入れる値（既定 1e-12）。"
                          "**実行時間を実際に決めているのはこれ**。1e-12 は「限界まで粘れ」"
@@ -505,6 +535,9 @@ def main():
         ap.error(f"--reform は {list(pp.CASES)} のいずれか")
     reform = dict(pp.CASES[args.reform])
     etas = [float(e) for e in args.eta.split(",") if e.strip()]
+
+    # --x-scale は 'jac' か数値。数値なら float に直して渡す
+    xs = args.x_scale if args.x_scale == "jac" else float(args.x_scale)
 
     os.makedirs(OUT, exist_ok=True)
     tags = [t.strip() for t in args.cases.split(",") if t.strip()]
@@ -538,7 +571,8 @@ def main():
                                       solve_tol=args.solve_tol,
                                       progress_every=args.progress_every,
                                       stop_at_tol=args.stop_at_tol,
-                                      solver_tols=args.solver_tols)
+                                      solver_tols=args.solver_tols,
+                                      x_scale=xs)
             print(f"[{i}/{len(plan)}] {label} 完了 ({time.time() - t0:.0f}s)")
         except Exception as e:                      # noqa: BLE001 — 打ち切らず続行
             print(f"[{i}/{len(plan)}] {label} 1回目失敗: {type(e).__name__}: {e}")
@@ -548,7 +582,8 @@ def main():
                                           solve_tol=args.retry_tol,
                                           progress_every=args.progress_every,
                                           stop_at_tol=args.stop_at_tol,
-                                          solver_tols=args.solver_tols)
+                                          solver_tols=args.solver_tols,
+                                          x_scale=xs)
                 retried.append(label)
                 print(f"[{i}/{len(plan)}] {label} 完了（緩和判定） "
                       f"({time.time() - t0:.0f}s)")

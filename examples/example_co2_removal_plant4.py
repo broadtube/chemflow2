@@ -247,7 +247,8 @@ CASES = {
 
 def run_case(tag: str, eta: float, purge: float, reform: dict, label: str,
              solve_tol: float = 1e-4, progress_every: int = 0,
-             stop_at_tol: bool = False, solver_tols: float = 1e-12) -> dict:
+             stop_at_tol: bool = False, solver_tols: float = 1e-12,
+             x_scale: str | float = "jac") -> dict:
     """1 ケース解いて、改質側 + plant4 側の指標を返す。"""
     use_upstream, position, tower, title = CASES[tag]
     print(f"\n{'=' * 78}\n=== {label}  {title}（η={eta:.0%}, パージ率={purge:.0%}）"
@@ -275,7 +276,8 @@ def run_case(tag: str, eta: float, purge: float, reform: dict, label: str,
     problem, streams, v = p4.solve_with_sv(
         feed=feed, co2_removal=plant_removal, co2_position=position,
         purge=purge, solve_tol=solve_tol, progress_every=progress_every,
-        stop_at_tol=stop_at_tol, solver_tols=solver_tols)
+        stop_at_tol=stop_at_tol, solver_tols=solver_tols,
+        solver_kwargs={"x_scale": x_scale})
 
     by = {s.name: s for s in problem.streams}
     Steam1, ReactorIn = by[S_FEED], by[S_REACTOR_IN]
@@ -349,6 +351,12 @@ def main():
                     help="‖residual‖ が --solve-tol を下回った時点で打ち切る。"
                          "合否判定を満たした瞬間に止めるので、合格ラインをとうに"
                          "下回ってから延々と粘る無駄が無くなる（実測 7〜8 倍速）")
+    ap.add_argument("--x-scale", default="jac",
+                    help="least_squares の x_scale（既定 'jac'）。'jac' はヤコビアン各列の"
+                         "ノルムの逆数から変数ごとのスケールを推定する（Moré 1978）。"
+                         "本問題は流量が 25 桁にわたるため、既定の 1.0（全変数を同じ"
+                         "物差しで測る）では trust region がうまく働かない。"
+                         "'1.0' を渡すと従来の挙動")
     ap.add_argument("--solver-tols", type=float, default=1e-12,
                     help="least_squares の ftol/xtol/gtol に一括で入れる値（既定 1e-12）。"
                          "**実行時間を実際に決めているのはこれ**")
@@ -368,6 +376,9 @@ def main():
     for t in tags:
         if t not in CASES:
             ap.error(f"--cases に未知のケース {t!r}（{list(CASES)} のいずれか）")
+
+    # --x-scale は 'jac' か数値。数値なら float に直して渡す
+    xs = args.x_scale if args.x_scale == "jac" else float(args.x_scale)
 
     os.makedirs(OUT, exist_ok=True)
 
@@ -395,7 +406,8 @@ def main():
                                       solve_tol=args.solve_tol,
                                       progress_every=args.progress_every,
                                       stop_at_tol=args.stop_at_tol,
-                                      solver_tols=args.solver_tols)
+                                      solver_tols=args.solver_tols,
+                                      x_scale=xs)
             print(f"[{i}/{len(plan)}] {label} 完了 ({time.time() - t0:.0f}s)")
         except Exception as e:                      # noqa: BLE001 — 打ち切らず続行
             print(f"[{i}/{len(plan)}] {label} 1回目失敗: {type(e).__name__}: {e}")
@@ -405,7 +417,8 @@ def main():
                                           solve_tol=args.retry_tol,
                                           progress_every=args.progress_every,
                                           stop_at_tol=args.stop_at_tol,
-                                          solver_tols=args.solver_tols)
+                                          solver_tols=args.solver_tols,
+                                          x_scale=xs)
                 retried.append(label)
                 print(f"[{i}/{len(plan)}] {label} 完了（緩和判定） "
                       f"({time.time() - t0:.0f}s)")
