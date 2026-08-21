@@ -234,15 +234,26 @@ CONTINUATION = ["1.41MPaG", "1.0MPaG", "0.7MPaG", "0.5MPaG",
 BASIS = ["mol", "mole_frac", "mass", "normal_volume"]
 
 
-def build(T, P, *, mode, feed_nl=None, seed=None):
+def build(T, P, *, mode, feed_nl=None, seed=None, co2_removal=None):
     """改質器のフローシートを組む。
 
     自由度:
-        A（mode="fixed"）  変数 19 / 方程式 19
+        A（feed_nl 指定）  変数 19 / 方程式 19
             供給が既知なので Mixed 4 + ReactOut 5 + DryGas 5 + Condensate 5 = 19、
             Mixer 4 + Gibbs 5 + Separator 5 + 飽和 1 + Henry 4 = 19。
         B〜D               変数 23 / 方程式 23
             供給 4 が未知になり、合計 1 + 比 1 + H2/CO 1 + 水蒸気を決める 1 が増える。
+
+    co2_removal に除去率 η を渡すと、**改質器の下流・プラントへ渡す手前**に CO2 除去塔
+    T-100 を置く（= 除去位置 (a)）。CO2 は改質器の中では CO 源として働かせたうえで、
+    下流の循環系には持ち込まない、という狙い。
+
+        DryGas ─[T-100]─→ PlantFeed（プラントへ）
+                   └────→ CO2Vent
+
+    塔はガス側に対しては「CO2 だけを η の割合で抜く分離器」なので Separator 1 個 +
+    回収率制約 1 本で表す（変数・式とも +6 で閉じる）。CO2Vent は 1 成分ストリームに
+    してあるので「他成分は回収率 0」を書く必要がない（書くと変数の無い式が増える）。
     """
     hot = StreamCondition(T=T, P=P, phase="gas")
     cold_g = StreamCondition(T=T_COND, P=P, phase="gas")
@@ -270,8 +281,25 @@ def build(T, P, *, mode, feed_nl=None, seed=None):
                             T=T, P=P, name="G1"),
                Separator(ReactOut, [DryGas, Condensate], name="Condenser")],
         name=f"Reformer {T:.0f}C {P}")
+    # 除去塔は上で problem に追加する（Problem 構築後に extend する形にしてある）
+    # --- CO2 除去塔（オプション・除去位置 (a)）---
+    scrub_streams, scrub_units = [], []
+    PlantFeed = DryGas
+    if co2_removal is not None:
+        PlantFeed = Stream(SPECIES, name="6. PlantFeed", order=6, condition=cold_g,
+                           guess=g("6. PlantFeed", {"CO": 2.5, "H2": 3.3, "CO2": 0.1,
+                                                     "CH4": 0.2, "H2O": 0.02}))
+        CO2Vent = Stream(["CO2"], name="7. CO2Vent", order=7, condition=cold_g)
+        scrub_streams = [PlantFeed, CO2Vent]
+        scrub_units = [Separator(DryGas, [PlantFeed, CO2Vent], name="T-100 CO2除去塔")]
+    problem.streams.extend(scrub_streams)
+    problem.units.extend(scrub_units)
+
     problem.constrain_saturation(DryGas, "H2O", T=T_COND, P=P)
     problem.constrain_henry(DryGas, Condensate, DISSOLVED, T=T_COND, P=P)
+    if co2_removal is not None:
+        problem.constrain_recovery(DryGas, scrub_streams[1], {"CO2": float(co2_removal)},
+                                   name=f"CO2除去率={co2_removal}")
 
     if feed_nl is None:
         problem.constrain(Feed.total_flow, TOTAL_NL / NV, name=f"合計 {TOTAL_NL} NL/h")
@@ -285,7 +313,7 @@ def build(T, P, *, mode, feed_nl=None, seed=None):
             problem.constrain(ReactOut.flow_expr("CH4"),
                               (1.0 - mode) * Feed.flow_expr("CH4"),
                               name=f"CH4 転化率={mode}")
-    return problem, (Feed, Mixed, ReactOut, DryGas, Condensate)
+    return problem, (Feed, Mixed, ReactOut, DryGas, Condensate, PlantFeed)
 
 
 def _solve(problem, fixed_feed):
@@ -300,7 +328,7 @@ def _solve(problem, fixed_feed):
     return sol
 
 
-def solve_case(tag, verbose=False):
+def solve_case(tag, verbose=False, co2_removal=None):
     """1 ケース解いて (problem, streams) を返す。
 
     低圧ケースは初期推定が悪いと縮退解（CH4→0）に落ちるので、目標圧力までの
@@ -309,14 +337,18 @@ def solve_case(tag, verbose=False):
     """
     cfg = CASES[tag]
     if "feed_nl" in cfg:                      # A: 供給を全固定
-        pb, st = build(cfg["T"], cfg["P"], mode="fixed", feed_nl=cfg["feed_nl"])
-        _solve(pb, True)
+        pb, st = build(cfg["T"], cfg["P"], mode="fixed", feed_nl=cfg["feed_nl"],
+                       co2_removal=co2_removal)
+        _solve(pb, co2_removal is None)
         return pb, st
 
     target = cfg["P"]
     seed = None
     for P in CONTINUATION:
-        pb, st = build(cfg["T"], P, mode=binding_mode(P), seed=seed)
+        # 連続法の途中では除去塔を付けない（塔はガス側の後処理なので改質器の解に
+        # 影響しない。付けると seed の形が変わって扱いが煩雑になるだけ）
+        pb, st = build(cfg["T"], P, mode=binding_mode(P), seed=seed,
+                       co2_removal=co2_removal if P == target else None)
         try:
             _solve(pb, False)
         except RuntimeError:
@@ -331,14 +363,15 @@ def solve_case(tag, verbose=False):
         if P == target:
             return pb, st
     # CONTINUATION に目標圧が無い場合は直接解く
-    pb, st = build(cfg["T"], target, mode=binding_mode(target), seed=seed)
+    pb, st = build(cfg["T"], target, mode=binding_mode(target), seed=seed,
+                   co2_removal=co2_removal)
     _solve(pb, False)
     return pb, st
 
 
 def summary(tag, problem, streams):
     """1 ケースの全指標を dict で返す。"""
-    Feed, _Mixed, ReactOut, DryGas, Condensate = streams
+    Feed, _Mixed, ReactOut, DryGas, Condensate, _PlantFeed = streams
     cfg = CASES[tag]
     f = {c: Feed.flow_of(c) for c in FEED_C}
     C = f["CH4"] + f["CO2"]
