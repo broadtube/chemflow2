@@ -215,7 +215,8 @@ def solve_with_sv(max_outer: int = 10, tol: float = 1e-4, verbose: bool = True,
                   feed: dict[str, float] | None = None,
                   co2_removal: float | None = None, purge: float = PURGE,
                   co2_position: str = "recycle", solve_tol: float = 1e-4,
-                  progress_every: int = 0):
+                  progress_every: int = 0, stop_at_tol: bool = False,
+                  solver_tols: float = 1e-12, solver_kwargs: dict | None = None):
     """2つの床がそれぞれ入口基準 SV を満たすまで触媒体積 (V1, V2) を外側反復する。
 
     g(V) = [volume_for(ReactorIn) − V1, volume_for(R2の入口) − V2] の零点を、
