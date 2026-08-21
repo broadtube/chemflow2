@@ -117,18 +117,37 @@ plant4 は未反応 DME をあえて循環させる設計なので、ループ C
 ────────────────────────────────────────────────────────────────────────
 実行方法
 ────────────────────────────────────────────────────────────────────────
-改質器だけなら Cantera のみで数秒。
+■ 改質器だけ（Cantera のみ。4 ケースで数秒）
 
     PYTHONPATH=. python3 -u examples/example_reformer.py
+    PYTHONPATH=. python3 -u examples/example_reformer.py --cases A,D
 
-下流まで通す場合は reaction_rate も要る（1 ケース 5〜20 分）。
+■ 下流まで通す（reaction_rate も要る）
 
     PYTHONPATH=.:../reaction_rate/src python3 -u examples/example_reformer_plant3.py
     PYTHONPATH=.:../reaction_rate/src python3 -u examples/example_reformer_plant4.py
 
+■ Windows (cmd)
+
+    set PYTHONPATH=.;..\reaction_rate\src
+    python -u examples\example_reformer.py
+    python -u examples\example_reformer_plant3.py
+
+**-u を付けること**（付けないと stdout がブロックバッファになり進捗が見えない）。
+
+■ 所要時間（実測）
+
+    改質器のみ            4 ケースで数秒
+    plant3 まで           1 ケース平均 2.5 分（0.8〜4.9）  4 ケース計 12 分
+    plant4 まで           1 ケース平均 4.6 分（2.5〜7.2）  4 ケース計 23 分
+
+plant3/plant4 側は --stop-at-tol と x_scale='jac' を既定で有効にしてある。
+これが無い場合は 3〜4 倍かかり、ばらつきも大きい（plant3 で最長 63 分の実績あり）。
+
 出力は examples/output/reformer/ 以下（既存の検討と混ざらないよう分けてある）。
 """
 
+import argparse
 import os
 
 from chemflow2 import (
@@ -351,10 +370,19 @@ def plant_feed(DryGas):
 
 
 def main():
+    ap = argparse.ArgumentParser(description="改質器 A〜D の比較")
+    ap.add_argument("--cases", default=",".join(CASES),
+                    help=f"実行するケース（{'/'.join(CASES)}）をカンマ区切りで")
+    args = ap.parse_args()
+    tags = [t.strip() for t in args.cases.split(",") if t.strip()]
+    for t in tags:
+        if t not in CASES:
+            ap.error(f"未知のケース {t!r}（{list(CASES)} のいずれか）")
+
     os.makedirs(OUT, exist_ok=True)
     print(f"=== 改質器 A〜D（供給合計 {TOTAL_NL} NL/h 固定）===\n")
     res = {}
-    for tag in CASES:
+    for tag in tags:
         print(f"--- {tag}: {CASES[tag]['note']}", flush=True)
         pb, st = solve_case(tag, verbose=True)
         res[tag] = summary(tag, pb, st)

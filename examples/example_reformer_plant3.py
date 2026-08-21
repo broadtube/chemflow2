@@ -29,7 +29,8 @@ CO2 を抜くと WGS が進んで CO が失われ、酢酸メチルが減った�
 ────────────────────────────────────────────────────────────────────────
 実行方法
 ────────────────────────────────────────────────────────────────────────
-要 Cantera（改質器）と reaction_rate（速度論 PFR）。1 ケース 5〜20 分。
+要 Cantera（改質器）と reaction_rate（速度論 PFR）。
+**実測: 1 ケース平均 2.5 分（0.8〜4.9）、4 ケース計 12 分。**
 
     PYTHONPATH=.:../reaction_rate/src python3 -u examples/example_reformer_plant3.py
     PYTHONPATH=.:../reaction_rate/src python3 -u examples/example_reformer_plant3.py --cases A,D

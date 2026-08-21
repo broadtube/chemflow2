@@ -35,7 +35,8 @@ CO2 が減ると DME が濃縮してパージで大量に失われた（損失�
 ────────────────────────────────────────────────────────────────────────
 実行方法
 ────────────────────────────────────────────────────────────────────────
-要 Cantera（改質器）と reaction_rate（速度論 PFR）。1 ケース 5〜20 分。
+要 Cantera（改質器）と reaction_rate（速度論 PFR）。
+**実測: 1 ケース平均 4.6 分（2.5〜7.2）、4 ケース計 23 分。**
 
     PYTHONPATH=.:../reaction_rate/src python3 -u examples/example_reformer_plant4.py
     PYTHONPATH=.:../reaction_rate/src python3 -u examples/example_reformer_plant4.py --cases A,D
