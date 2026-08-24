@@ -83,14 +83,16 @@ def block_plan(label: str) -> list[tuple[str, int, str]]:
     100 番刻みなのは、1 ブロックのストリームが増えても衝突しないため。
     桁を見れば結合シートだけで出どころが分かる。
 
-    後段が plant3 か plant4 かは**ラベルの "p4_" 接頭辞**で判別する
-    （example_co2_removal_plant4.py が付ける）。
+    後段が plant3 か plant4 かは**ラベルの "p4" 接頭辞**で判別する。接頭辞は
+    出力元スクリプトごとに違うので両方を見る:
+        example_co2_removal_plant4.py          → "p4_A" …
+        example_reformer_co2removal_plant4.py  → "p4RA" …
 
     ⚠ (b)/(c) の吸収塔は厳密にはプラントの**途中**にある。そこに列を割り込ませると
     プラント側の番号が飛んで読みにくくなるので、末尾に置いたうえで**帯の表示名に
     位置を書く**という妥協にしてある。
     """
-    is_p4 = label.startswith("p4_")
+    is_p4 = label.startswith(("p4_", "p4R"))
     reformer = ("reformer", 100, "改質器 (pattern1)")
     plant = (("plant4", 300, "MA プラント (plant4: 2段反応器)") if is_p4
              else ("plant3", 300, "MA プラント (plant3)"))

@@ -221,6 +221,10 @@ import examples.example_reformer as rf         # 前工程（改質器・新前�
 from chemflow2 import export_mermaid, stream_table, to_excel
 
 OUT = rf.OUT      # examples/output/reformer/（既存の検討と混ざらないよう分離）
+# 吸収塔は cr.report_caustic() に任せているが、あれは cr.OUT（= examples/output/）へ
+# 書く。ここで差し替えないと caustic だけ別ディレクトリに落ちて merge_xlsx.py が
+# 3 ブロック揃わないと判断し、baseline 以外が結合されない。
+cr.OUT = OUT
 
 #: 比較の土台にする改質条件。example_reformer.CASES の A〜D。
 #: 1 回の比較の中では固定すること（改質条件の効果と除去位置の効果が混ざるため）。
