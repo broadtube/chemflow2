@@ -7,7 +7,16 @@ build/
 dist/
 *.csv
 !examples/*.csv
-examples/output/
+# 計算結果は入れない（xlsx 287 件・html 216 件で 12 MB）。ただし指標 JSON
+# だけは追跡する: 68 件 272 KB のテキストで、総当たり 1 回に約 6 時間かかる
+# 計算の要約。元は標準出力にしか無く、tee を忘れると再現できなかった。
+#
+# ディレクトリごと除外すると中のファイルを ! で復活できない（git の仕様）ので、
+# **中身を除外して掘り進める**書き方にしてある。1 段ずつ開けているのはそのため。
+examples/output/*
+!examples/output/reformer/
+examples/output/reformer/*
+!examples/output/reformer/*_metrics.json
 
 # 論文 PDF はリポジトリに置かない（本リポジトリは公開・著作権者は各出版社）。
 # references/PAPERS_INDEX.md と carbon_activity.html に書誌・DOI・入手先を

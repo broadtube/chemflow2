@@ -698,7 +698,12 @@ def main() -> int:
         import json
         n = 0
         for rec in index:
-            got = {k: rec[k] for k in SUMMARY_METRICS if k in rec}
+            # 各スクリプトが書く JSON と同じ名前で出す。サマリ側は ALIAS で
+            # 寄せた名前（触媒 合計）を持っているので、plant3 の元の名前
+            # （全触媒体積）に戻してから書く。混在すると diff が読みにくい。
+            names = METRICS3 if rec["plant"] == "plant3" else METRICS4
+            got = {n: rec[ALIAS.get(n, n)] for n in names
+                   if ALIAS.get(n, n) in rec}
             if not got:
                 continue
             with open(os.path.join(args.outdir,
