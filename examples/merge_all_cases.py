@@ -303,9 +303,19 @@ def parse_log(path: str) -> dict[tuple[str, str], dict]:
                     break
             if len(values) == len(metrics):
                 break
-        blocks[(m.group(1), m.group(2))] = {
-            "values": values if len(values) == len(metrics) else None,
-            "names": metrics, "ok": ok, "status": status}
+        key = (m.group(1), m.group(2))
+        new = {"values": values if len(values) == len(metrics) else None,
+               "names": metrics, "ok": ok, "status": status}
+        # 同じ (反応管, 改質条件) が 2 回出るのは、収束しなかったケースを直して
+        # そのブロックを解き直したとき。**表を持つ区間を、持たない区間で上書き
+        # しない**（後から 1 ケースだけ回した区間には比較表が出ない）。
+        prev = blocks.get(key)
+        if prev and prev["values"] is not None and new["values"] is None:
+            prev["status"].update(status)
+            continue
+        if prev:
+            new["status"] = {**prev["status"], **status}
+        blocks[key] = new
     return blocks
 
 
