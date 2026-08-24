@@ -434,6 +434,12 @@ def main():
     results, failed, retried = {}, [], []
     for i, (tag, eta, label) in enumerate(plan, 1):
         t0 = time.time()
+        # 前回の指標 JSON を先に消す。残したままだと、このケースが失敗したときに
+        # **古い値が最新の結果として集計される**（write_metrics は成功時にしか
+        # 書かないので、失敗しても JSON は前回のまま残ってしまう）。
+        stale_metrics = os.path.join(OUT, f"co2removal_{label}_metrics.json")
+        if os.path.exists(stale_metrics):
+            os.remove(stale_metrics)
         try:
             results[label] = run_case(tag, eta, args.purge, reform, label,
                                       solve_tol=args.solve_tol,
