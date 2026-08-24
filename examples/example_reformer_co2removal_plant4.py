@@ -344,6 +344,27 @@ def run_case(tag: str, eta: float, purge: float, reform: dict, label: str,
     }
 
 
+
+def write_metrics(label: str, tag: str, eta: float, metrics: dict, *,
+                  plant: str, reform: str, note: str = "") -> None:
+    """指標を xlsx の隣に JSON で残す。
+
+    サマリ集計（merge_all_cases.py）は元々この指標を**標準出力の比較表**から
+    拾っていた。だが表は画面に出るだけなので、`| tee` を付け忘れて回すと
+    **xlsx は全部揃っているのに指標だけ再現できない**。計算し直す以外に手が無く、
+    しかも 1 ケース数分かかる。結果と一緒に残しておけばその事故は起きない。
+
+    比較表そのものは人が読む用に残す（列で並ぶほうが比べやすい）。JSON は
+    機械が読む用で、両者は同じ dict から出るので食い違わない。
+    """
+    import json
+    path = os.path.join(OUT, f"co2removal_{label}_metrics.json")
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump({"label": label, "plant": plant, "reform": reform,
+                   "case": tag, "eta": eta, "note": note,
+                   "metrics": metrics}, f, ensure_ascii=False, indent=1)
+
+
 def main():
     ap = argparse.ArgumentParser(
         description="CO2 除去位置 (a)/(b)/(c) の比較 — 後工程 plant4")
@@ -420,6 +441,8 @@ def main():
                                       stop_at_tol=args.stop_at_tol,
                                       solver_tols=args.solver_tols,
                                       x_scale=xs)
+            write_metrics(label, tag, eta, results[label],
+                          plant="plant4", reform=args.reform)
             print(f"[{i}/{len(plan)}] {label} 完了 ({time.time() - t0:.0f}s)")
         except Exception as e:                      # noqa: BLE001 — 打ち切らず続行
             print(f"[{i}/{len(plan)}] {label} 1回目失敗: {type(e).__name__}: {e}")
@@ -432,6 +455,8 @@ def main():
                                           solver_tols=args.solver_tols,
                                           x_scale=xs)
                 retried.append(label)
+                write_metrics(label, tag, eta, results[label],
+                              plant="plant4", reform=args.reform, note="緩和判定")
                 print(f"[{i}/{len(plan)}] {label} 完了（緩和判定） "
                       f"({time.time() - t0:.0f}s)")
             except Exception as e2:                 # noqa: BLE001

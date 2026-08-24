@@ -33,12 +33,22 @@ plant3 が 7 ケース刻み・plant4 が 10 ケース刻みなのは、
 の 2 点による。3 + 3 = 6 に baseline 1 を足して 7、c_interstage の 3 を足して 10。
 
 ────────────────────────────────────────────────────────────────────────
-サマリ指標をログから採るのはなぜか
+サマリ指標はどこから来るか
 ────────────────────────────────────────────────────────────────────────
-12 指標は run_case() が返して各スクリプトが「除去位置の比較」表として印字する。
+run_case() が返す指標を、各スクリプトが 2 つの形で出す。
+
+    co2removal_{label}_metrics.json   ← 主。xlsx の隣に必ず残る
+    標準出力の「除去位置の比較」表      ← 従。人が読む用（列で並ぶほうが比べやすい）
+
 xlsx から再計算することもできるが、そうすると**定義がスクリプトと二重管理**になる。
 「新鮮CO基準 炭素収率」の分母や「CO2 正味生成」の符号のような判断が 2 か所に散ると、
-片方だけ直したときに黙ってズレる。ログの表をそのまま読めば定義は 1 か所で済む。
+片方だけ直したときに黙ってズレる。どちらも同じ dict から出るので食い違わない。
+
+**当初はログの表だけを読んでいた。** だが表は画面に出るだけなので、`| tee` を
+付け忘れて回すと **xlsx は全部揃っているのに指標だけ再現できない**。別の環境で
+回した結果を持ってきたときにも同じことが起きる。JSON なら結果と一緒に運べる。
+
+古い結果（JSON が無い）は --export-metrics でログから移植できる。
 
 表の列順は results dict の挿入順 = plan の順 = 上の No. の順なので、列見出しを
 解釈する必要がない（見出しは 18 桁固定幅に収まらず隣とくっつくため解釈できない）。
@@ -359,6 +369,28 @@ def attach_metrics(index: list[dict], blocks: dict) -> tuple[int, list[str]]:
     return filled, warn
 
 
+def attach_sidecars(index: list[dict], outdir: str) -> int:
+    """各ケースが書いた co2removal_{label}_metrics.json を読む。
+
+    指標名は plant3 / plant4 で違うが、JSON は dict なので名前で引ける
+    （ログの表と違って列位置に依存しない）。ALIAS で同義の列に寄せる。
+    """
+    import json
+    n = 0
+    for rec in index:
+        p = os.path.join(outdir, f"co2removal_{rec['label']}_metrics.json")
+        if not os.path.exists(p):
+            continue
+        with open(p, encoding="utf-8") as f:
+            d = json.load(f)
+        for k, v in d.get("metrics", {}).items():
+            rec[ALIAS.get(k, k)] = v
+        if d.get("note"):
+            rec["備考"] = d["note"]
+        n += 1
+    return n
+
+
 # ────────────────────────────────────────────────────────────────
 # 結合済み xlsx の読み取り
 # ────────────────────────────────────────────────────────────────
@@ -627,6 +659,9 @@ def main() -> int:
     ap.add_argument("--no-merge", action="store_true",
                     help="merge_xlsx.py の結合を省く（結合済みのときだけ）")
     ap.add_argument("--prefix", default="all", help="出力ファイル名の接頭辞（既定 all）")
+    ap.add_argument("--export-metrics", action="store_true",
+                    help="ログから読んだ指標を JSON サイドカーに書き出す"
+                         "（tee を付けずに回した古い結果を移植するとき用）")
     args = ap.parse_args()
 
     index = build_index()
@@ -643,14 +678,38 @@ def main() -> int:
                 if merge_xlsx.merge_label(lb, args.outdir) is not None]
         print(f"ケース結合: {len(done)} / {len(labels)} ケース")
 
-    # ── 2. ログからサマリ指標 ─────────────────────────────────
-    if os.path.exists(args.log):
-        filled, warn = attach_metrics(index, parse_log(args.log))
-        print(f"サマリ指標: {filled} / {len(index)} ケース分をログから取得")
-        for w in warn:
-            print(f"  ⚠ {w}")
-    else:
-        print(f"  ⚠ ログが無い（{args.log}）— サマリの指標列は空になります")
+    # ── 2. サマリ指標: JSON サイドカーを主、ログを従とする ──────────
+    # サイドカーは各ケースが xlsx の隣に書くので、結果と一緒に必ず残る。ログは
+    # `| tee` を付けて回したときにしか無いので、古い結果を読むときの保険。
+    n_json = attach_sidecars(index, args.outdir)
+    print(f"サマリ指標: {n_json} / {len(index)} ケース分を JSON から取得")
+    if n_json < len(index):
+        if os.path.exists(args.log):
+            filled, warn = attach_metrics(index, parse_log(args.log))
+            print(f"  ログから追加: {filled} ケース分（{args.log}）")
+            for w in warn:
+                print(f"  ⚠ {w}")
+        elif n_json == 0:
+            print(f"  ⚠ JSON もログも無い — サマリの指標列は空になります\n"
+                  f"     計算をやり直すか、計算した環境から "
+                  f"co2removal_*_metrics.json をコピーしてください")
+
+    if args.export_metrics:
+        import json
+        n = 0
+        for rec in index:
+            got = {k: rec[k] for k in SUMMARY_METRICS if k in rec}
+            if not got:
+                continue
+            with open(os.path.join(args.outdir,
+                                   f"co2removal_{rec['label']}_metrics.json"),
+                      "w", encoding="utf-8") as f:
+                json.dump({"label": rec["label"], "plant": rec["plant"],
+                           "reform": rec["reformer"], "case": rec["case"],
+                           "eta": rec["eta"], "note": rec.get("備考", ""),
+                           "metrics": got}, f, ensure_ascii=False, indent=1)
+            n += 1
+        print(f"✓ metrics.json を {n} 件書き出しました")
 
     # ── 3. 結合済み xlsx を読む ───────────────────────────────
     merged, missing = {}, []
