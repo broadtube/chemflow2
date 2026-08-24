@@ -91,7 +91,8 @@ docstring と同じ理由: 1 回の比較の中で改質条件を固定しない
 自分が plant3 か plant4 かを出力しない。ログを取らないなら不要。
 
 **Windows (cmd) で回すなら**本体スクリプト側の docstring にある set 版を使う
-（`set PYTHONPATH=.;..\reaction_rate\src`）。上の for ループは bash 用。
+（`set PYTHONPATH=.;../reaction_rate/src` の区切りを円記号にしたもの）。
+上の for ループは bash 用。
 
 やり直すと JSON は上書きされる。失敗したケースは JSON が消えるだけで、古い値が
 残ることはない（本体スクリプトがケース開始時に消してから解く）。ただし
