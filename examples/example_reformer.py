@@ -316,16 +316,60 @@ def build(T, P, *, mode, feed_nl=None, seed=None, co2_removal=None):
     return problem, (Feed, Mixed, ReactOut, DryGas, Condensate, PlantFeed)
 
 
+#: 流量を負とみなす閾値。丸め由来の -1e-12 程度で失敗扱いにしないため。
+_NEG_TOL = 1e-9
+
+
 def _solve(problem, fixed_feed):
-    """A は供給既知なので root で素直に解ける。B〜D は非負制約つきで解く。"""
+    """A は供給既知なので root で素直に解ける。B〜D は非負制約つきで解く。
+
+    非負版が失敗したら root で解き直す。least_squares の trf は
+    **解が存在しても収束しないことがある**: D (875C/0.1MPaG) + CO2 除去率 0.5 は
+    残差 4.2e-06 で停滞して 100×変数数 = 2900 回の評価上限に当たる。同じ D の
+    除去率 0.9 / 0.99 も、他の改質条件の 0.5 も 10〜30 回で 1e-14 まで落ちるので、
+    条件が解けないわけではない。実測で潰した仮説:
+
+        max_nfev を 20000 に上げる    → 4.18e-06 で停滞（6.9 倍で改善 2.6 倍だけ）
+        x_scale='jac' → 1.0           → 4.199e-06、ほぼ同値
+        塔なしの解を seed に与える     → 1.077e-05、悪化すらする
+        bounds の上限 1e3 が邪魔       → 変数の最大値は 3.07 で張り付いていない
+        bounds=None (root) で解く      → ‖r‖=9.7e-15 で一発。**負の流量も無い**
+
+    最後の 1 行が要点で、非負制約は**この解には不要**（自然に満たされる）。
+    trf の信頼領域が制約付きで進めなくなっているだけなので、root に落とすのが正しい。
+
+    ただし root は非負を保証しないので、**落ちてきた解が非負であることを確認**して
+    から受け取る。負なら物理的に無意味なので、元の失敗として投げる。
+    """
     if fixed_feed:
         sol = problem.solve(bounds=None, tol=1e-7)
-    else:
-        sol = problem.solve(bounds=(0, 1e3), tol=1e-7,
-                            ftol=1e-14, xtol=1e-14, gtol=1e-14, x_scale="jac")
-    if not sol.success:
-        raise RuntimeError(f"{problem.name} が収束せず: {sol}")
-    return sol
+        if not sol.success:
+            raise RuntimeError(f"{problem.name} が収束せず: {sol}")
+        return sol
+
+    x0 = problem._pack().copy()          # 失敗時に初期値へ戻すため
+    sol = problem.solve(bounds=(0, 1e3), tol=1e-7,
+                        ftol=1e-14, xtol=1e-14, gtol=1e-14, x_scale="jac")
+    if sol.success:
+        return sol
+
+    # solve() は結果を streams に書き戻すので、失敗した trf の停滞点がそのまま
+    # 次の初期値になってしまう。root にはあくまで**元の初期値**を渡す
+    # （停滞点から始めると root も評価回数を使い切って落ちる — 実測済み）。
+    problem._unpack(x0)
+    fallback = problem.solve(bounds=None, tol=1e-7)
+    if fallback.success:
+        neg = [(st.name, f) for st in problem.streams
+               for f, v in zip(st.formulas, st.molar_flows) if v < -_NEG_TOL]
+        if not neg:
+            return fallback
+        # 非負制約を外した解が負を含む = その条件は物理的に成立しない。
+        # 非負版の失敗をそのまま投げて、呼び出し側の判断に委ねる。
+        problem._unpack(x0)
+        raise RuntimeError(f"{problem.name} が収束せず（root は負の流量 "
+                           f"{neg[:3]} を返した）: {sol}")
+    problem._unpack(x0)
+    raise RuntimeError(f"{problem.name} が収束せず: {sol}")
 
 
 def solve_case(tag, verbose=False, co2_removal=None):
@@ -345,10 +389,9 @@ def solve_case(tag, verbose=False, co2_removal=None):
     target = cfg["P"]
     seed = None
     for P in CONTINUATION:
-        # 連続法の途中では除去塔を付けない（塔はガス側の後処理なので改質器の解に
+        # 連続法では除去塔を付けない（塔はガス側の後処理なので改質器の解に
         # 影響しない。付けると seed の形が変わって扱いが煩雑になるだけ）
-        pb, st = build(cfg["T"], P, mode=binding_mode(P), seed=seed,
-                       co2_removal=co2_removal if P == target else None)
+        pb, st = build(cfg["T"], P, mode=binding_mode(P), seed=seed)
         try:
             _solve(pb, False)
         except RuntimeError:
@@ -361,8 +404,24 @@ def solve_case(tag, verbose=False, co2_removal=None):
         if verbose:
             print(f"    継続: {P}", flush=True)
         if P == target:
-            return pb, st
-    # CONTINUATION に目標圧が無い場合は直接解く
+            break
+    else:
+        # CONTINUATION に目標圧が無い場合は直接解く
+        pb, st = build(cfg["T"], target, mode=binding_mode(target), seed=seed)
+        _solve(pb, False)
+        seed = {s.name: s.molar_flows.copy() for s in pb.streams}
+
+    if co2_removal is None:
+        return pb, st
+
+    # 除去塔は**塔なしの解を seed にして**最後に足す。塔はガス側の後処理なので
+    # 塔なしの解は改質器部分の厳密解そのもので、これ以上の初期値は無い。
+    #
+    # 以前は連続法の最終段で塔を付けていた。すると塔の変数だけ初期値が無いまま
+    # 解くことになり、D (875C/0.1MPaG) + 除去率 0.5 が収束しなかった。この 1 条件は
+    # 「初期値だけ」でも「root だけ」でも通らず、**両方揃って初めて** 1e-14 に届く
+    # （実測: 塔なし seed + trf = 1.08e-05 停滞 / 連続法 seed + root = 評価回数超過 /
+    #  塔なし seed + root = 9.7e-15）。_solve() のフォールバックと対で効いている。
     pb, st = build(cfg["T"], target, mode=binding_mode(target), seed=seed,
                    co2_removal=co2_removal)
     _solve(pb, False)
