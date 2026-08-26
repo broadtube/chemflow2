@@ -156,21 +156,73 @@ PYTHONPATH の "." は examples.* を絶対 import するため、"../reaction_r
     PYTHONPATH=.:../reaction_rate/src python3 -u examples/example_reformer_co2removal_plant4.py \
         --cases baseline,b_recycle,c_interstage --eta 0.9 --solve-tol 1e-4 --stop-at-tol
 
+■ 触媒 sizing の規約（--sv-mode）— **plant3 と比べるなら必ず意識すること**
+
+plant3 と plant4 では SV=5000 の適用先が違っていた。同じ「SV=5000」と書いてあり
+ながら hybrid 床では 3 倍ずれ、触媒総量が 1.88 倍になる。触媒体積を含む指標
+（STY・触媒合計・触媒/MA）は、規約を揃えないと比較が成立しない。
+
+    --sv-mode plant3   （既定）両床とも R1 入口 F を基準に V_hyb=F/15000, V_MA=F/7500
+                       = 合計 F/5000 を hybrid:MA = 1:2 で割る。example_plant3 と同一。
+    --sv-mode per-bed  各床を**自分の入口**で SV=5000。この検討の元の設計。
+
+**既定が plant3 なので、フラグ無しで回すと examples/output/reformer/ の既存 40 ケース
+とは違う結果になる。** あれは per-bed で回したもので、再現には --sv-mode per-bed が要る。
+
+規約を揃えると plant4 は plant3 とほぼ一致した（改質条件 A・baseline）:
+
+                        p4 per-bed   p4 plant3規約    plant3
+    酢酸メチル [mol/h]        0.5007       0.4877     0.4876
+    触媒 合計 [mL]          382.15       202.95     202.99
+
+段間水抜き (Cond1) の効果は実質ゼロ。カルボニル化の速度式が水阻害を無視している
+（carbonylation.py「乾燥前提 K_w=0」）ため。plant4 が baseline で優れて見えたのは
+触媒が 1.88 倍あったことによる。
+
+■ 出力先（--outdir）
+
+規約を変えて回すときは**別ディレクトリに出すこと**。ラベルが同じなので同じ場所に
+出すと上書きになり、merge_all_cases.py が新旧の混ざった集計を作る。
+
+    --outdir examples/output/reformer_sv3
+
+--outdir は cr.OUT も差し替える。吸収塔サブフローシートは cr.report_caustic() に
+任せていて、あれは cr.OUT を見るため（別ディレクトリに落ちて結合が全滅する事故を
+一度踏んでいる）。
+
 ■ 総当たり（改質条件 4 種 × 除去位置 3 種 × η 3 点 = 40 runs）
 
-    PYTHONPATH=.:../reaction_rate/src python3 -u examples/example_reformer_co2removal_plant4.py --reform A --cases baseline,a_upstream,b_recycle,c_interstage --eta 0.5,0.9,0.99 --solve-tol 1e-4 --stop-at-tol
-    PYTHONPATH=.:../reaction_rate/src python3 -u examples/example_reformer_co2removal_plant4.py --reform B --cases baseline,a_upstream,b_recycle,c_interstage --eta 0.5,0.9,0.99 --solve-tol 1e-4 --stop-at-tol
-    PYTHONPATH=.:../reaction_rate/src python3 -u examples/example_reformer_co2removal_plant4.py --reform C --cases baseline,a_upstream,b_recycle,c_interstage --eta 0.5,0.9,0.99 --solve-tol 1e-4 --stop-at-tol
-    PYTHONPATH=.:../reaction_rate/src python3 -u examples/example_reformer_co2removal_plant4.py --reform D --cases baseline,a_upstream,b_recycle,c_interstage --eta 0.5,0.9,0.99 --solve-tol 1e-4 --stop-at-tol
+    OUT=examples/output/reformer_sv3
+    export PYTHONPATH=.:../reaction_rate/src
+    for R in A B C D; do
+      python3 -u examples/example_reformer_co2removal_plant4.py --reform "$R" \
+        --cases baseline,a_upstream,b_recycle,c_interstage --eta 0.5,0.9,0.99 \
+        --sv-mode plant3 --outdir "$OUT" --solve-tol 1e-4 --stop-at-tol
+    done
+    python3 examples/merge_all_cases.py --outdir "$OUT"   # 集計（結合も内部で走る）
 
-    python3 examples/merge_xlsx.py --all     # 最後に 3 つの xlsx を 1 つに結合
+plant3 側 28 ケースは規約が変わらないので再計算不要。同じ集計に載せるなら
+examples/output/reformer/ から co2removal_R*_{reformer,plant3,caustic}.xlsx と
+co2removal_R*_metrics.json を $OUT にコピーすればよい。
+
+■ 旧規約（per-bed）で回す場合 — examples/output/reformer/ の既存 40 ケースの再現
+
+**--sv-mode per-bed を明示すること。** 既定は plant3 なので、付け忘れると別物になる。
+
+    export PYTHONPATH=.:../reaction_rate/src
+    for R in A B C D; do
+      python3 -u examples/example_reformer_co2removal_plant4.py --reform "$R" \
+        --cases baseline,a_upstream,b_recycle,c_interstage --eta 0.5,0.9,0.99 \
+        --sv-mode per-bed --solve-tol 1e-4 --stop-at-tol
+    done
+    python3 examples/merge_all_cases.py      # 既定の出力先 examples/output/reformer/
 
 ■ Windows (cmd)
 
     set PYTHONPATH=.;..\reaction_rate\src
     set OMP_NUM_THREADS=1
     set OPENBLAS_NUM_THREADS=1
-    python -u examples\example_reformer_co2removal_plant4.py --reform A --cases baseline,a_upstream,b_recycle,c_interstage --eta 0.5,0.9,0.99 --solve-tol 1e-4 --stop-at-tol
+    python -u examples\example_reformer_co2removal_plant4.py --reform A --cases baseline,a_upstream,b_recycle,c_interstage --eta 0.5,0.9,0.99 --sv-mode plant3 --outdir examples\output\reformer_sv3 --solve-tol 1e-4 --stop-at-tol
 
 改質条件ごとに分けるのは仕様（1 回の比較の中で固定しないと「改質条件の効果」と
 「除去位置の効果」が混ざる）。plant3 版と同じ理由。

@@ -86,6 +86,22 @@ docstring と同じ理由: 1 回の比較の中で改質条件を固定しない
 
     python3 examples/merge_all_cases.py          # ← 最後にこれ 1 本
 
+**plant4 は触媒 sizing の規約を --sv-mode で選べる。** 上の手順は既定 (plant3) で
+回すので、plant3 と同じ規則になり STY を横比較できる。examples/output/reformer/ に
+入っている既存 40 ケースは旧規約 (per-bed) で回したものなので、そちらを再現する
+なら --sv-mode per-bed を付ける。規約を変えて回すときは --outdir を分けること
+（ラベルが同じなので同じ場所だと上書きになり、新旧の混ざった集計ができる）:
+
+    OUT=examples/output/reformer_sv3
+    python3 -u examples/example_reformer_co2removal_plant4.py --reform A \
+      --cases baseline,a_upstream,b_recycle,c_interstage --eta 0.5,0.9,0.99 \
+      --sv-mode plant3 --outdir "$OUT" --solve-tol 1e-4 --stop-at-tol
+    python3 examples/merge_all_cases.py --outdir "$OUT"
+
+plant3 側は規約が変わらないので再計算不要。同じ集計に載せるなら
+co2removal_R*_{reformer,plant3,caustic}.xlsx と co2removal_R*_metrics.json を
+$OUT にコピーすればよい。
+
 `######## plant3 REFORM=A ########` の見出し行が要るのは、ログのどの区間がどの
 (反応管, 改質条件) のものかを parse_log() が判別できないため。スクリプト自身は
 自分が plant3 か plant4 かを出力しない。ログを取らないなら不要。
