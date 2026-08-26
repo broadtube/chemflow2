@@ -46,7 +46,20 @@ STEAM1 = {"H2": 4.911989, "CO": 3.549828, "CO2": 1.675074, "CH4": 0.243186,
           "H2O": 0.0288, "CH3CHO": 0.0, "CH3COOH": 0.0, "N2": 0.0}
 
 # --- 触媒の設計基準（reaction_rate の fig_tandem_sty_stack_zsm5 と同一）---
-SV = 5000.0                                      # [1/h] ← 各床とも自分の入口基準
+SV = 5000.0                                      # [1/h]
+#: 触媒体積の決め方。plant3 と比較するときは規約を揃えないと STY が比べられない。
+#:
+#:   "per-bed" … 各床を**自分の入口**で SV=5000 にする（この検討の元の設計）
+#:   "plant3"  … 両床とも**R1 入口**を基準に V_hyb=F/15000, V_MA=F/7500
+#:               （= 合計 F/5000 を hybrid:MA = 1:2 で割る。example_plant3 と同一規則）
+#:
+#: per-bed は R1 に自分の入口基準で SV=5000 を与えるので、plant3 の hybrid 床
+#: (15000/h) の 3 倍の接触時間になる。その結果 hybrid が CO を食い過ぎ、MA 床が
+#: CO 不足で DME を捌けなくなる（実測: plant4 D b_recycle η0.9 で hybrid が CO の
+#: 76% を消費、R2 の DME/CO = 15.6、DME 転化率 2.5%）。plant3 と比べる目的なら
+#: "plant3" を使う。
+SV_MODE_DEFAULT = "per-bed"
+R_MA = 2.0                                       # V_MA / V_hybrid（plant3 と同じ 1:2）
 RHO_SYN, RHO_DEH, RHO_MA = 1300.0, 800.0, 837.0  # 充填密度 [kg/m³]
 F_SYN = 1.0 / 1.9          # ハイブリッド床の体積分率（synthesis 側）
 VM_STP = 22.414e-3         # 標準状態モル体積 [m³/mol]
@@ -216,11 +229,16 @@ def solve_with_sv(max_outer: int = 10, tol: float = 1e-4, verbose: bool = True,
                   co2_removal: float | None = None, purge: float = PURGE,
                   co2_position: str = "recycle", solve_tol: float = 1e-4,
                   progress_every: int = 0, stop_at_tol: bool = False,
-                  solver_tols: float = 1e-12, solver_kwargs: dict | None = None):
-    """2つの床がそれぞれ入口基準 SV を満たすまで触媒体積 (V1, V2) を外側反復する。
+                  solver_tols: float = 1e-12, solver_kwargs: dict | None = None,
+                  sv_mode: str = SV_MODE_DEFAULT):
+    """触媒体積 (V1, V2) を外側反復で決める。狙う値は sv_mode で変わる。
 
-    g(V) = [volume_for(ReactorIn) − V1, volume_for(R2の入口) − V2] の零点を、
-    成分ごとの割線法で探す（各評価が1回のフローシート求解なので回数を切り詰める）。
+        per-bed : g(V) = [volume_for(ReactorIn) − V1, volume_for(R2の入口) − V2]
+        plant3  : g(V) = [F/15000 − V1, F/7500 − V2]   （F = ReactorIn。R2 入口は見ない）
+
+    どちらも零点を成分ごとの割線法で探す（各評価が1回のフローシート求解なので
+    回数を切り詰める）。plant3 モードでは第2成分が R2 入口に依存しなくなるが、
+    F 自身が循環で決まるので反復は依然として必要。
 
     feed / co2_removal / purge / co2_position は build() にそのまま渡す。
     solve_tol は Problem.solve の残差ノルム判定（既定 1e-4 の理由は g() のコメント）。
@@ -247,22 +265,35 @@ def solve_with_sv(max_outer: int = 10, tol: float = 1e-4, verbose: bool = True,
         n1 = float(streams[1].total_flow.eval())    # ReactorIn
         # 第2床の SV 基準は「R2 の実際の入口」。段間に除去塔を挿すと Cond1Gas では
         # なく ScrubbedGas が R2 の入口になるので、そちらを見ないと SV がずれる。
-        r2_in = next(u.inlets[0] for u in problem.units if u.name == "R2 MA bed")
-        n2 = float(r2_in.total_flow.eval())
-        v_new = np.array([volume_for(n1), volume_for(n2)])
+        if sv_mode == "plant3":
+            # 両床とも R1 入口基準。合計 = F/SV を 1:(R_MA) で割る。
+            v_tot = volume_for(n1)
+            v_new = np.array([v_tot / (1.0 + R_MA), v_tot * R_MA / (1.0 + R_MA)])
+            n2 = None                               # この規約では R2 入口を見ない
+        else:
+            # 第2床の SV 基準は「R2 の実際の入口」。段間に除去塔を挿すと Cond1Gas では
+            # なく ScrubbedGas が R2 の入口になるので、そちらを見ないと SV がずれる。
+            r2_in = next(u.inlets[0] for u in problem.units if u.name == "R2 MA bed")
+            n2 = float(r2_in.total_flow.eval())
+            v_new = np.array([volume_for(n1), volume_for(n2)])
         state["seed"] = {s.name: s.molar_flows.copy() for s in streams}
         state["problem"], state["streams"] = problem, streams
         n_pfr = sum(u.n_pfr_calls for u in problem.units if hasattr(u, "n_pfr_calls"))
         if verbose:
+            n2s = f"{n2:7.3f}" if n2 is not None else "      -"
             print(f"  [{it}] V=({v[0]*1e6:7.3f}, {v[1]*1e6:7.3f}) mL → "
-                  f"入口=({n1:7.3f}, {n2:7.3f}) mol/h → "
+                  f"入口=({n1:7.3f}, {n2s}) mol/h → "
                   f"V_SV=({v_new[0]*1e6:7.3f}, {v_new[1]*1e6:7.3f}) mL   "
                   f"({time.time()-t0:.1f}s, PFR積分 {n_pfr}回, nfev={sol.nfev})")
         return v_new - v
 
     n_feed = sum((feed if feed is not None else STEAM1).values())
-    v_prev = np.array([volume_for(RECYCLE_GUESS * n_feed),
-                       volume_for(GAS_FRACTION_GUESS * RECYCLE_GUESS * n_feed)])
+    if sv_mode == "plant3":
+        _vt = volume_for(RECYCLE_GUESS * n_feed)
+        v_prev = np.array([_vt / (1.0 + R_MA), _vt * R_MA / (1.0 + R_MA)])
+    else:
+        v_prev = np.array([volume_for(RECYCLE_GUESS * n_feed),
+                           volume_for(GAS_FRACTION_GUESS * RECYCLE_GUESS * n_feed)])
     g_prev = g(v_prev, 1)
     if np.all(np.abs(g_prev) <= tol * v_prev):
         return state["problem"], state["streams"], v_prev
@@ -278,6 +309,11 @@ def solve_with_sv(max_outer: int = 10, tol: float = 1e-4, verbose: bool = True,
             d = g_cur[i] - g_prev[i]
             step = -g_cur[i] * (v[i] - v_prev[i]) / d if d != 0.0 else g_cur[i]
             v_next[i] = np.clip(v[i] + step, 0.2 * v[i], 5.0 * v[i])
+        if sv_mode == "plant3":
+            # この規約では V2 = R_MA·V1 が解の必要条件（両方とも同じ F から決まる）。
+            # 割線法は 2 成分を独立に動かすので、比率を外れた点を試して反復を無駄に
+            # 使う。1 次元の多様体に射影して戻す（解は変わらない）。
+            v_next[1] = R_MA * v_next[0]
         v_prev, g_prev = v, g_cur
         v = v_next
     raise RuntimeError("触媒体積の外側反復が収束しませんでした")

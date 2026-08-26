@@ -253,7 +253,8 @@ CASES = {
 def run_case(tag: str, eta: float, purge: float, reform: dict, label: str,
              solve_tol: float = 1e-4, progress_every: int = 0,
              stop_at_tol: bool = False, solver_tols: float = 1e-12,
-             x_scale: str | float = "jac") -> dict:
+             x_scale: str | float = "jac",
+             sv_mode: str = p4.SV_MODE_DEFAULT) -> dict:
     """1 ケース解いて、改質側 + plant4 側の指標を返す。"""
     use_upstream, position, tower, title = CASES[tag]
     print(f"\n{'=' * 78}\n=== {label}  {title}（η={eta:.0%}, パージ率={purge:.0%}）"
@@ -286,7 +287,7 @@ def run_case(tag: str, eta: float, purge: float, reform: dict, label: str,
         feed=feed, co2_removal=plant_removal, co2_position=position,
         purge=purge, solve_tol=solve_tol, progress_every=progress_every,
         stop_at_tol=stop_at_tol, solver_tols=solver_tols,
-        solver_kwargs={"x_scale": x_scale})
+        solver_kwargs={"x_scale": x_scale}, sv_mode=sv_mode)
 
     by = {s.name: s for s in problem.streams}
     Steam1, ReactorIn = by[S_FEED], by[S_REACTOR_IN]
@@ -366,6 +367,7 @@ def write_metrics(label: str, tag: str, eta: float, metrics: dict, *,
 
 
 def main():
+    global OUT                      # --outdir で差し替えるため
     ap = argparse.ArgumentParser(
         description="CO2 除去位置 (a)/(b)/(c) の比較 — 後工程 plant4")
     ap.add_argument("--eta", default="0.90",
@@ -397,6 +399,13 @@ def main():
                     help="Problem.solve の残差ノルム判定（既定 1e-4）。**絶対値**なので"
                          "スケール依存。plant4 は PFR の積分誤差で残差が 3e-6 で"
                          "頭打ちになるため 1e-6 のような厳しい値には到達できない")
+    ap.add_argument("--sv-mode", choices=("plant3", "per-bed"), default="plant3",
+                    help="触媒体積の決め方。plant3（既定）= 両床とも R1 入口基準で "
+                         "V_hyb=F/15000・V_MA=F/7500（example_plant3 と同一規則、"
+                         "STY を plant3 と比較できる）。per-bed = 各床を自分の入口で "
+                         "SV=5000（examples/output/reformer/ の既存 40 ケースはこちら）")
+    ap.add_argument("--outdir", default=OUT,
+                    help=f"出力先（既定 {OUT}）。規約を変えて回すときは別ディレクトリに")
     ap.add_argument("--retry-tol", type=float, default=1e-3,
                     help="1 回目が収束判定を外したときの緩和 solve_tol（既定 1e-3）")
     args = ap.parse_args()
@@ -405,6 +414,10 @@ def main():
         ap.error(f"--reform は {list(rf.CASES)} のいずれか")
     reform = args.reform
     etas = [float(e) for e in args.eta.split(",") if e.strip()]
+    OUT = args.outdir
+    cr.OUT = OUT                       # 吸収塔サブフローシートも同じ場所へ
+    os.makedirs(OUT, exist_ok=True)
+
     tags = [t.strip() for t in args.cases.split(",") if t.strip()]
     for t in tags:
         if t not in CASES:
@@ -446,7 +459,7 @@ def main():
                                       progress_every=args.progress_every,
                                       stop_at_tol=args.stop_at_tol,
                                       solver_tols=args.solver_tols,
-                                      x_scale=xs)
+                                      x_scale=xs, sv_mode=args.sv_mode)
             write_metrics(label, tag, eta, results[label],
                           plant="plant4", reform=args.reform)
             print(f"[{i}/{len(plan)}] {label} 完了 ({time.time() - t0:.0f}s)")
@@ -459,7 +472,7 @@ def main():
                                           progress_every=args.progress_every,
                                           stop_at_tol=args.stop_at_tol,
                                           solver_tols=args.solver_tols,
-                                          x_scale=xs)
+                                          x_scale=xs, sv_mode=args.sv_mode)
                 retried.append(label)
                 write_metrics(label, tag, eta, results[label],
                               plant="plant4", reform=args.reform, note="緩和判定")
