@@ -154,6 +154,9 @@
     <a href="#K">平衡定数</a>
     <a href="#diagram">析出限界線図</a>
     <a href="#whisker">黒鉛基準の限界</a>
+    <a href="#calib">定量照合</a>
+    <a href="#source">出典の選択</a>
+    <a href="#tdep">温度依存</a>
     <a href="#impl">実装</a>
   </div>
 </nav>
@@ -434,7 +437,19 @@
 
     <p>原著の但し書きが効いている: “Whisker carbon was observed on the rhodium and platinum catalysts, but <b>in both cases contamination of the catalyst with iron most probably caused the formation of whiskers</b>.” つまり <b>真にウィスカーを作るのは Ni と Pd だけ</b>。Ru・Ir は明確に “No whiskers”。</p>
 
-    <p class="subhead">5.3 &nbsp;Alstrup の粒子径補正 — <span style="color:var(--amber)">本プロジェクトでは不採用</span></p>
+    <p class="subhead">5.3 &nbsp;Alstrup の粒子径補正 — <span style="color:var(--amber)">既定では使わない（オプションとして実装）</span></p>
+
+    <div class="note">
+      <p class="h">2026-08-29 追記 — <code>dG_dev</code> として実装した</p>
+      <p>下記の不採用理由は<b>「既定にしない」根拠としてそのまま有効</b>だが、§8.2 の入口温度の検証で
+        この補正を当てる必要が出てきたため、<b>明示的に指定したときだけ効くオプション</b>として実装した:</p>
+      <p><code>carbon_activity(p, T, dG_dev=whisker_dG_dev(200))</code> ／
+        <code>carbon_activity_of(stream, dG_dev=...)</code> ／
+        <code>problem.constrain_carbon_activity(..., dG_dev=...)</code>。
+        <code>whisker_dG_dev(d_nm)</code> が ΔG<sub>dev</sub> = 2.6 + 93/d [kJ/mol] を返す（d 省略で黒鉛極限 2.6 kJ/mol）。</p>
+      <p><b>ΔG<sub>dev</sub> は固体炭素側の量なので 3 経路すべてに同じ係数 exp(−ΔG<sub>dev</sub>/RT) が掛かり、
+        平衡気相での 3 経路の一致は保たれる</b>——§7.2 で「補正するならこの形しかない」と決めたとおり。既定は 0（黒鉛基準）。</p>
+    </div>
 
     <div class="note">
       <p class="h">🚫 不採用 — 記録として残すが、計算にも判断にも使わない</p>
@@ -488,12 +503,16 @@
       本プロジェクトの a<sub>C</sub> ≤ 1 制約はその実務と整合する。</p>
 
     <div class="note">
-      <p class="h">実測との整合 — 村長 1961</p>
-      <p>村長 潔（東北肥料）は CH₄–H₂O–CO₂ 系の炭素析出曲線を 595–982 ℃ で実測し、<b>「温度 816 ℃以上では実験値と理論値はほぼ一致するが、706 ℃以下では全般に実験値の方が低く」</b>と報告している。低温側で「理論より析出しにくい」のは上記のずれと同じ向き。本プロジェクトの運転温度 850–900 ℃ は「ほぼ一致」する範囲に入る。</p>
+      <p class="h">実測との整合 — 村長 1961（全文確認済み）</p>
+      <p>村長 潔（東北肥料）は CH₄–H₂O–CO₂ 系の炭素析出曲線を 595–982 ℃ で実測し、<b>「温度 816 ℃以上では炭素析出曲線の実験値と理論値はほぼ一致するが、706 ℃以下では全般に実験値の方が低く」</b>と報告している。低温側で「理論より析出しにくい」のは上記のずれと同じ向き。本プロジェクトの運転温度 850–900 ℃ は「ほぼ一致」する範囲に入る。考察の理由づけも本実装の前提と同じで、<b>「816 ℃以上ではすべての反応がほとんど平衡に達すると考えられるので、この場合はほとんど理論値と同じ傾向を示す」</b>としている。</p>
+      <p><b>さらに重要なのは計算法のほうで、§2 の「3 経路は一致する」を 1961 年の一次資料が実演している。</b>
+        同論文は活量比 <span class="inl">A₃ = a<sub>CH₄</sub>/a<sub>H₂</sub>²</span>（本実装の M）、<span class="inl">A₄ = a<sub>CO</sub>·a<sub>H₂</sub>/a<sub>H₂O</sub></span>（同 R）、<span class="inl">A₅ = a<sub>CO</sub>²/a<sub>CO₂</sub></span>（同 B）を作り、
+        それぞれを平衡定数 K₃・K₄・K₅ で切った交点から最小水蒸気量を求めたうえで、A₅ の交点<b>「からも同じ値が得られる」</b>と明記している。
+        <b>「a<sub>C</sub> = 1 を課して最小水蒸気量を解く」という本実装の <code>constrain_carbon_activity</code> の使い方そのもの</b>でもある。</p>
     </div>
 
     <div class="note">
-      <p class="h">千代田化工の立ち位置 — a_C ≤ 1 は同社触媒を前提にしない条件</p>
+      <p class="h">千代田化工の立ち位置 — 触媒耐性は a_C &gt; 1 まで。ただし設計は a_C = 0.90</p>
       <p>AIChE 2008 原文: “operations on the <b>left side of the carbon limit curve are more economical</b> … But in these conditions, product synthesis gases have <b>high thermodynamic potential for carbon formation</b>. In our process, feed gas conditions on the left side of carbon limit line <b>could be selected because our catalyst has high resistance against carbon formation</b>.”</p>
       <p>つまり CT-CO2AR® の売りは <b>「a<sub>C</sub> &gt; 1 の領域でも運転できる触媒耐性」</b>にある。</p>
       <p><b>ただし同社の設計実務はそうではない。</b> 特許 WO2012140994A1 の表 5（公報 20 頁）を見ると、
@@ -523,10 +542,585 @@
       こちらの検討（900 ℃・1.04 MPaG・H₂O/CH₄ = 0.72）と同じ領域を、a<sub>C</sub> = 0.90 に収めている。</p>
   </section>
 
+  <!-- ============ 定量照合 ============ -->
+  <section id="calib">
+    <div class="sec-head">
+      <h2>6 &nbsp;千代田の計算との定量照合（全 21 点）</h2>
+      <span class="tag">21 points · ±13%</span>
+    </div>
+    <p class="cite">再現: <code>PYTHONPATH=. python3 -u examples/example_chiyoda_patent_check.py</code> ·
+      同族特許 5 件（WO2012140994A1 / JP2004-210626A / JP2012-219068A / JP5738658B2 / JP5738743B2・JP2013-103909A）の<b>全実施例</b> ·
+      PDF は他の文献と同じくリポジトリに置かない</p>
+
+    <div class="note">
+      <p class="h">⚠️ 2026-08-29 改訂 — 旧結論「一律 12% 高い＝Stull 1969 との版差」は撤回</p>
+      <p>以前はメタノール系特許の 6 点だけを見て「本実装は千代田より一律 12% 高く、
+        それは Stull 1969 と現代データの版差で説明できる」と書いていた。
+        <b>点を 21 に増やしたらその説明は成り立たなくなった</b>（下の温度依存を参照）。</p>
+    </div>
+
+    <p>千代田の同族特許は<b>すべて同じ定義</b>（Boudouard 1 本、平衡定数の出典は Stull 1969）を使う。
+      実施例に書かれた Ac の数値を全部拾って照合した。</p>
+
+    <div class="tbl-scroll">
+      <table>
+        <caption>点の出どころ — 群によって供給の与えられ方が違う（信頼度が違う）</caption>
+        <thead><tr><th>群</th><th>出典</th><th>n</th><th>条件</th><th>供給の与えられ方</th></tr></thead>
+        <tbody>
+          <tr><td><b>A</b></td><td>JP2004-210626A 表1・本文・表3</td><td>12</td><td>650 / 850 ℃、0.5 / 2.0 MPaG、Ac 0.09〜2.8</td><td class="match"><b>CH₄/CO₂/H₂O のモル比で明記。原料は純 CH₄ のラボ試験。平衡転化率も併記</b></td></tr>
+          <tr><td><b>B</b></td><td>JP2012-219068A（= JP5738658B2）4 点<br>JP5738743B2（= JP2013-103909A）2 点</td><td>6</td><td>875 ℃、1.85 / 2.0 MPaG</td><td>S/C と CO₂/C のみ。<b>原料は C₂〜C₆ を含む実天然ガス</b></td></tr>
+          <tr><td><b>C</b></td><td>WO2012140994A1 表5</td><td>3</td><td>550 / 850 ℃</td><td>4 例とも Ac = 0.90 ちょうど＝<b>設計目標値</b></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="tbl-scroll">
+      <table>
+        <caption>結果 — 群と温度ごとの比（特許 ÷ 本実装）</caption>
+        <thead><tr><th>群</th><th>T</th><th>n</th><th>比</th><th>向き</th></tr></thead>
+        <tbody>
+          <tr><td>A</td><td>650 ℃</td><td>4</td><td>0.899 ± 0.008</td><td>本実装が 11% 高い</td></tr>
+          <tr><td>A</td><td>850 ℃</td><td>8</td><td>1.070 ± 0.021</td><td class="match"><b>本実装が 7% 低い（符号が逆）</b></td></tr>
+          <tr><td>B</td><td>875 ℃</td><td>6</td><td>0.882 ± 0.023</td><td>本実装が 13% 高い</td></tr>
+          <tr><td>C</td><td>550 / 850 ℃</td><td>3</td><td>0.967 ± 0.002</td><td>本実装が 3% 高い</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p><b>850 ℃ と 875 ℃ でずれの符号が反転する。</b> ΔG は温度の滑らかな関数なので、
+      <b>熱力学データの版の違いではこれは起こせない</b>。ここが旧結論を撤回した理由。</p>
+
+    <h3 style="font-size:15px;margin:26px 0 10px;">6.1 &nbsp;ずれの切り分け — 5 つの検算</h3>
+
+    <div class="note acc">
+      <p class="h">検算 1 &nbsp;組成側は合っている</p>
+      <p>JP2004 は<b>平衡 CH₄ 転化率</b>も書いている。CH₄:CO₂ = 1:1（850 ℃・2.0 MPaG）で
+        特許 <b>55%</b> に対し本実装 <b>55.5%</b>、CH₄:CO₂:H₂O = 1:0.4:0.85 で
+        特許 <b>57%</b> に対し <b>57.4%</b>。どちらも 2 桁表記の丸め幅の内側。
+        <b>気相平衡（組成）の計算は千代田と一致している。</b></p>
+    </div>
+
+    <div class="note acc">
+      <p class="h">検算 2 &nbsp;熱力学データは JANAF 級</p>
+      <p>ΔG°(2CO → C + CO₂) @ 298.15 K = <b>−120.04 kJ/mol</b>（CODATA/JANAF −120.02）。
+        黒鉛 S°(298) = <b>5.734</b>（JANAF 5.740）、S°(1000) = <b>24.451</b>（24.457）、
+        Cp(298) = <b>8.528</b>（8.517）。ΔG°(CH₄ ⇌ C + 2H₂) @ 298.15 K も <b>+50.53</b>（既知値 +50.7）。
+        <b>こちら側のデータに疑う余地は無い。</b></p>
+    </div>
+
+    <div class="tbl-scroll">
+      <table>
+        <caption>検算 3 — 出典を替えたらどれだけ動くか。ΔG°(2CO → C + CO₂) [kJ/mol]</caption>
+        <thead><tr><th>出典</th><th>650 ℃</th><th>850 ℃</th><th>875 ℃</th></tr></thead>
+        <tbody>
+          <tr><td>gri30 + graphite.yaml（本実装）</td><td>−8.791</td><td>26.236</td><td>30.588</td></tr>
+          <tr><td>NASA9 gas + NASA condensed</td><td>−8.791</td><td>26.236</td><td>30.588</td></tr>
+          <tr><td>methane_pox_on_pt + graphite</td><td>−8.949</td><td>26.045</td><td>30.393</td></tr>
+          <tr><td>古典式 −170700 + 174.5·T</td><td>−9.610</td><td>25.290</td><td>29.652</td></tr>
+          <tr><td><b>特許が要求する値（群 A から逆算）</b></td><td class="match"><b>−7.977</b></td><td class="match"><b>25.604</b></td><td>—</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p>まともな出典はどれも <b>0.8 kJ/mol 以内</b>で一致する。特許の数値を再現するには
+      <b>ΔH を +7.4 kJ/mol、ΔS を +7.2 J/mol·K</b> ずらす必要があり、そんな値を出す出典は無い
+      （Boudouard の ΔH°・ΔS° は 1950 年代の NBS 値でも現代値と 1 kJ 以内）。
+      <b>「平衡定数の出典の違い」ではこのずれは説明できない。</b></p>
+
+    <div class="note acc">
+      <p class="h">検算 4 &nbsp;同じ温度でも比が組成で変わる</p>
+      <p>850 ℃・群 A の 8 点を比の順に並べると <b>1.033（1/1/0・丸め ±0.18%）→ 1.057（1/0/1）→
+        1.060（1/1/0.5）→ 1.087（1/0.4/0.85）→ 1.098（1/0/3）</b>。丸め幅を超えてばらつく。
+        <b>K<sub>B</sub> の誤差なら同一温度の全点が同じ比になるはず</b>なので、
+        これは<b>組成側の前提も違う</b>ことを意味する。</p>
+      <p>裏づけ: JP2012 表1 の物質収支（天然ガス 116,000 Nm³/h・CO₂ 26,000・スチーム 160 t/h）から
+        出口を計算すると本実装は dry で <b>H₂ 63.6 / CO 21.8 / CO₂ 6.5 / CH₄ 8.1 mol%</b>。
+        特許の表（H₂ 添加後 S7）は <b>H₂ 63 / CO 21 / CO₂ 7 / CH₄ 9</b> で、
+        <b>特許のリフォーマー出口は完全平衡より転化が浅い</b>（approach がある）。</p>
+    </div>
+
+    <div class="note acc">
+      <p class="h">検算 5 &nbsp;ウィスカーカーボンでずれを説明できるか — <b>できない</b></p>
+      <p>ウィスカー炭素は黒鉛より<b>不安定</b>なので、基準をずらすなら <b>ΔG<sub>dev</sub> &gt; 0 しかありえない</b>
+        （a<sub>C</sub> は exp(−ΔG<sub>dev</sub>/RT) 倍で必ず<b>下がる</b>）。各点で必要な ΔG<sub>dev</sub> の符号を見ると:</p>
+      <div class="tbl-scroll">
+        <table>
+          <caption>特許値を再現するのに必要な ΔG<sub>dev</sub>（負はウィスカーでは実現不可能）</caption>
+          <thead><tr><th>群・温度</th><th>n</th><th>必要 ΔG<sub>dev</sub> [J/mol]</th><th>ウィスカーで説明可能か</th></tr></thead>
+          <tbody>
+            <tr><td><b>A・850 ℃</b></td><td>8</td><td><b>−300 〜 −869</b></td><td><b>✗ 不可能（負）</b></td></tr>
+            <tr><td>A・650 ℃</td><td>4</td><td>+720 〜 +890</td><td>向きは可。ただし小さすぎる</td></tr>
+            <tr><td>B・875 ℃</td><td>6</td><td>+715 〜 +1473</td><td>同上</td></tr>
+            <tr><td>C・550/850 ℃</td><td>3</td><td>+216 〜 +333</td><td>同上</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p><b>否定の根拠は 3 つある。</b></p>
+      <ul style="margin:6px 0 0 18px;line-height:1.85;">
+        <li><b>① 符号が逆になる点がある。</b> 負が要るのは<b>群 A の 850 ℃ の 8 点すべて</b>。
+          群 A は供給がモル比で明記され、平衡転化率で組成側も検算できている<b>最も信頼できる群</b>。</li>
+        <li><b>② 大きさが足りない。</b> 正の側でも必要量は 216〜1473 J/mol で、
+          Alstrup の下限（黒鉛極限 <b>2600 J/mol</b>）にすら届かない。</li>
+        <li><b>③ 温度が同じなら同じ値になるはず。</b> ΔG<sub>dev</sub> は温度だけの関数なのに、
+          850 ℃・群 A では −300 〜 −869 と <b>569 J/mol もばらつく</b>
+          （最精度 2 点の丸め由来の不確かさは ±17 と ±35 J/mol）。§6 検算 4 と同じ結論。</li>
+      </ul>
+      <p><b>入口側とは対照的。</b> §8.2 の入口温度のずれは ΔG<sub>dev</sub> ≈ +3.1 kJ/mol で
+        2 ケースとも一貫して説明できる。<b>出口（特許）は黒鉛基準、入口（有識者）はそれより
+        緩い基準</b>——という食い違いがある可能性を示している。実際、特許は炭素の基準について
+        <b>何も書いていない</b>（「ウィスカー」「黒鉛」「粒子径」いずれも 0 件）が、
+        しきい値 1.0 に対して 0.90 で設計しているのは黒鉛基準の規約そのもの。</p>
+    </div>
+
+    <div class="note">
+      <p class="h">⚠️ 群 B の但し書き — 原料は純 CH₄ ではない</p>
+      <p>JP2012 表1 の天然ガスは <b>CH₄ 91.5 / C₂ 4.2 / C₃ 2.5 / C₄ 1.3 / C₅ 0.4 / C₆ 0.1 mol%</b>
+        （H/C = 3.736、純 CH₄ なら 4.0）。S/C・CO₂/C の分母がこの C₂₊ を含むので
+        <b>CH₄ = 1 と置く解釈は近似</b>。しかも同じ表から S/C は全炭素基準（1.49）、
+        CO₂/C は CH₄ 炭素基準（0.245）と読めてしまい、<b>特許内で基準が揃っていない</b>。</p>
+    </div>
+
+    <div class="note acc">
+      <p class="h">結論 — 完全一致は熱力学データの差し替えでは達成できない</p>
+      <p>残差の主因は 3 つ: <b>(a)</b> 特許値が 2 桁表記（Ac = 0.09 なら丸めだけで ±5.6%）、
+        <b>(b)</b> 特許側の組成の前提（平衡への接近度・実天然ガスの C₂₊）、
+        <b>(c)</b> 千代田の社内相関／シミュレータの中身が不明。</p>
+      <p>2 パラメータ（ΔH, ΔS）の経験補正を当てると残差は ±10% → ±5% に下がるが、
+        丸め幅に収まるのは 12 点中 3 点だけで、物理的な裏づけも無い。<b>採用しない。</b></p>
+      <p><b>照合として言えること:</b> Ac 0.09〜2.8（30 倍）・650〜875 ℃・0.5〜2.0 MPaG の
+        21 点で <b>±13% 以内</b>、大小関係はすべて一致。組成側は独立に検算でき、
+        熱力学データは JANAF と一致している。定義（Boudouard 1 本）も平衡気相では
+        本実装の 3 経路最大値と厳密に同値（ばらつき ≤ 2×10⁻¹²）。</p>
+    </div>
+  </section>
+
+  <!-- ============ 出典の選択 ============ -->
+  <section id="source">
+    <div class="sec-head">
+      <h2>7 &nbsp;どの出典の式を採るか — 決定と理由</h2>
+      <span class="tag">gri30 / JANAF を維持</span>
+    </div>
+    <p class="cite">決定日 2026-08-29 · §6 の 21 点照合を受けた判断 · 判断基準は「特許に近いか」ではない</p>
+
+    <p>§6 のとおり、特許との差は<b>温度で符号が変わり、同じ温度でも組成で変わる</b>。
+      つまり<b>どの出典を選んでも特許に合わせ込むことはできない</b>ので、
+      「どれが千代田に近いか」は選択基準として使えない。代わりに次の 3 つで決めた。</p>
+
+    <h3 style="font-size:15px;margin:22px 0 10px;">7.1 &nbsp;千代田が明記している出典は 3 つ</h3>
+
+    <p>手元の千代田資料（<b>特許 5 件 + AIChE 2008</b>）を全文検索して確定した。
+      <b>3 つとも別々の文書に 1 つずつ</b>書かれていて、役割が分かれている。</p>
+
+    <div class="tbl-scroll">
+      <table>
+        <caption>千代田が出典として明記している 3 件（2026-08-29 確定）</caption>
+        <thead><tr><th>#</th><th>出典</th><th>どこに</th><th>何のために</th><th>入手</th></tr></thead>
+        <tbody>
+          <tr><td>1</td><td><b>D. R. Stull, E. F. Westrum Jr., G. C. Sinke《The Chemical Thermodynamics of Organic Compounds》John Wiley (1969)</b></td><td>特許 5 件すべて（JP2004-210626A【0045】ほか）</td><td><b>平衡定数と温度の関係</b></td><td>✗ 未入手<br>DOI 無し（書籍）</td></tr>
+          <tr><td>2</td><td><b>J. R. Rostrup-Nielsen, J.-H. Bak Hansen, <i>J. Catal.</i> 144, 38 (1993)</b></td><td>AIChE 2008 参考文献 1)</td><td>貴金属は Ni より炭素生成に不活性／強ルイス塩基性担体が効く（触媒設計の土台）</td><td class="match">✅ 取得済<br>DOI 10.1006/jcat.1993.1312</td></tr>
+          <tr><td>3</td><td><b>N. R. Udengaard, J.-H. Bak Hansen, D. C. Hanson, <i>Oil &amp; Gas J.</i> 90(10), Mar. 9 (1992)</b></td><td>AIChE 2008 参考文献 4)。本文で「carbon limit diagram⁴⁾」</td><td><b>炭素析出限界線図そのもの</b>（Fig.4 の “Carbon Activity = 1”）</td><td>✗ 未入手<br>DOI 無し（商業誌）</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="note">
+      <p class="h">★ カーボン活性の<b>定義式</b>の出典は、どの文書にも書かれていない</p>
+      <p>特許は式（4）(5)(6) を自分で書き下ろしたうえで「平衡定数の温度依存は Stull を参考に」としか言わず、
+        AIChE 2008 は式を書かずに線図を Udengaard に帰している。
+        <b>定義の一次出典を確認するなら #3 の Udengaard 1992 が唯一の候補</b>。</p>
+      <p>⚠️ 以前 §0-2c に「千代田が挙げている出典」として載せていた
+        <b>I. Alstrup ら, <i>Stud. Surf. Sci. Catal.</i> 119, 5 (1992)</b> は、
+        <b>手元の千代田資料を全文検索しても 0 件</b>だった（<span class="inl">Alstrup</span> / <span class="inl">Stud.</span> /
+        <span class="inl">whisker</span> いずれも 0）。出所を特定できないので<b>この 3 件からは外した</b>。</p>
+    </div>
+
+    <div class="note acc">
+      <p class="h">★ Stull 1969 は取得できなかったが、それでも「平衡定数の版差」仮説は閉じられる（2026-08-29）</p>
+      <p><b>取得の試み:</b> Internet Archive の項目（Krieger 版・904 頁・OCR 済）は
+        <code>access-restricted-item: true</code> の貸出制で、本文も中身検索 API も <b>403</b>。
+        HathiTrust も <b>403</b>。1969 年の Wiley 刊なので<b>合法的な無料全文は存在しない</b>。
+        入手するなら archive.org のアカウントで 1 時間貸出、国会図書館の遠隔複写、大学図書館のいずれか。</p>
+      <p><b>根拠 1 — データの年代:</b> NIST Webbook（Chase 1998 = NIST-JANAF 第 4 版）の CO・CO₂ のページには
+        <b>“Data last reviewed in September, 1965”</b> と注記されている。
+        <b>Stull 1969 が参照できた値と現行 JANAF の値は同じ年代のもの</b>で、
+        「1969 年の本だから古い」では 4〜6% もの K の差は作れない。</p>
+      <p><b>根拠 2 — 独立データでの裏取り:</b> NIST の Shomate 係数（CO・CO₂）＋黒鉛で組み直した
+        ΔG°(2CO → C + CO₂) は Cantera と <b>0.034 kJ/mol（K で 0.4%）</b>しか違わない
+        （923.15 K: −8.817 対 −8.791 / 1123.15 K: 26.203 対 26.236 / 1148.15 K: 30.554 対 30.588）。
+        特許が要求する ΔH +7.4 kJ/mol・ΔS +7.2 J/mol·K とは桁が違う。</p>
+      <p><b>根拠 3 — 数表の刻み幅:</b> 1969 年の数表は 100 K 刻みが標準なので直線内挿の誤差も試したが、
+        650 ℃ +4.6% / 850 ℃ +2.6% / 875 ℃ +3.5% と<b>3 温度とも同符号</b>で、
+        観測される符号反転は作れない。</p>
+      <p>→ <b>Stull 1969 を入手しても結論は変わらない見込み</b>。優先度は下げてよい。
+        再現は <code>examples/example_chiyoda_patent_check.py</code> の検算 3b。</p>
+    </div>
+
+    <div class="note acc">
+      <p class="h">この 3 つが揃えば千代田の計算式が分かるか — <b>部分的にしか分からない</b></p>
+      <p><b>#1 Stull 1969 で確かめられること:</b> 千代田が使った K<sub>B</sub>(T) の数値そのもの。
+        ただし §6 のとおり、<b>ずれは温度で符号が変わり同じ温度でも組成で変わる</b>ので、
+        平衡定数の版差では説明できないことがすでに分かっている。
+        Stull を入手しても<b>「平衡定数の版差では説明できない」を確定させる</b>ところまでにとどまる見込み。</p>
+      <p><b>#3 Udengaard 1992 で確かめられること:</b> 線図の描き方と、定義式が Boudouard 1 本か 3 経路か。
+        ただし定義自体は特許【0068】で確認済みで、6 頁の商業誌解説なので
+        <b>計算の詳細まで書かれている見込みは高くない</b>。</p>
+      <p><b>本当に効いている要因は公開資料には無い。</b> §6 検算 4 のとおり、残差の主因は
+        千代田側の<b>組成の前提</b>（平衡への接近度・実天然ガスの C₂₊・S/C の分母の取り方）で、
+        これは社内のプロセスシミュレータの設定であって文献には書かれない。</p>
+    </div>
+
+    <div class="note acc">
+      <p class="h">基準 1（決定打）&nbsp; 平衡組成と同じデータでなければ 3 経路の一致が壊れる</p>
+      <p>本実装の a<sub>C</sub> は <code>GibbsReactor</code> の平衡組成と<b>同じ gri30 のデータ</b>から
+        平衡定数を作っている。だからこそ §2 のとおり平衡気相で 3 経路が厳密に一致する
+        （実測ばらつき 10⁻¹³ 台）。<b>K<sub>B</sub> だけを別出典に差し替えるとこれが壊れる</b>:</p>
+      <div class="tbl-scroll">
+        <table>
+          <caption>JP2012 実施例1 の条件で、K<sub>B</sub> を 1.068 倍した場合（＝特許に寄せた場合）</caption>
+          <thead><tr><th>やり方</th><th>Boudouard</th><th>CH₄ 分解</th><th>CO 還元</th><th>3 経路のばらつき</th></tr></thead>
+          <tbody>
+            <tr><td>現行（同一データ）</td><td>0.48794</td><td>0.48794</td><td>0.48794</td><td class="match">2×10⁻¹¹ %</td></tr>
+            <tr><td>K<sub>B</sub> だけ 1.068 倍</td><td>0.52132</td><td>0.48794</td><td>0.48794</td><td><b>6.4%</b> ← 一致が壊れる</td></tr>
+            <tr><td>黒鉛の g を同量ずらす</td><td>0.52132</td><td>0.52132</td><td>0.52132</td><td class="match">2×10⁻¹¹ %</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>一致が壊れると「どの経路で判定するか」で答えが変わり、<code>constrain_carbon_activity</code> が
+        制約をかけている当の反応器と食い違う。<b>補正するなら K<sub>B</sub> ではなく
+        固体炭素側（黒鉛の g）を動かすしかない</b>——3 経路すべてが exp(−g<sub>C</sub>) を共有するので
+        一致が保たれる。§5.3 のウィスカー補正を入れるとしたらこの形になる。</p>
+    </div>
+
+    <div class="note acc">
+      <p class="h">基準 2 &nbsp; 追跡可能な標準値であること</p>
+      <p>現行の gri30 + graphite.yaml（NASA / Gordon–McBride）は <b>JANAF・CODATA と一致する</b>
+        （§6 検算 2）。第三者が同じ数字を再現でき、出典を明示できる。
+        千代田の社内値は<b>公開されていないので追跡できない</b>。</p>
+    </div>
+
+    <div class="tbl-scroll">
+      <table>
+        <caption>基準 3 &nbsp;出典の違いが設計にどれだけ効くか（改質器ケース C 相当・875 ℃・0.417 MPaG）</caption>
+        <thead><tr><th>出典</th><th>ΔG 差 [kJ/mol]</th><th>K<sub>B</sub> 比</th><th>同じ供給での a<sub>C</sub></th><th>a<sub>C</sub> = 0.90 に必要な H₂O/CH₄</th><th>変化</th></tr></thead>
+        <tbody>
+          <tr><td><b>gri30 / NASA9（現行・JANAF 級）</b></td><td>0.000</td><td>1.0000</td><td>0.9000</td><td>0.3611</td><td class="match">基準</td></tr>
+          <tr><td>methane_pox_on_pt</td><td>−0.195</td><td>1.0206</td><td>0.9185</td><td>0.3701</td><td>+2.5%</td></tr>
+          <tr><td>古典式 −170700 + 174.5·T</td><td>−0.936</td><td>1.1030</td><td>0.9927</td><td>0.4053</td><td><b>+12.2%</b></td></tr>
+          <tr><td>（参考）特許を再現する補正</td><td>−0.632</td><td>1.0684</td><td>0.9616</td><td>0.3907</td><td>+8.2%</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p><b>キュレートされた現代データ同士（gri30 と NASA9）は完全に一致し、設計に差が出ない。</b>
+      2.5% 動く methane_pox_on_pt は表面反応機構に付随する熱力学で、精度の担保がない。
+      12% 動く古典式は 2 パラメータの直線近似であって<b>データ出典ではない</b>——採ってはいけない。</p>
+
+    <div class="note acc">
+      <p class="h">決定</p>
+      <p><b>gri30 + graphite.yaml（JANAF 級）を既定のまま維持する。</b> 特許に合わせる補正は入れない。</p>
+      <p>理由は上の 3 点。加えて<b>工学的にはこの差はすでに設計余裕に吸収されている</b>:
+        千代田自身が出口 a<sub>C</sub> = 0.90 で設計している（＝ 1.0 に対し 10% の余裕）。
+        §6 の 21 点で本実装と特許の差は ±13% なので、<b>a<sub>C</sub> ≤ 0.90 を守っていれば、
+        出典の不確かさを込みにしても 1.0 を超える可能性は小さい</b>。</p>
+      <p>もし特定の特許の数値を再現したい場面（設計レビューで千代田の数字と突き合わせる等）が
+        出てきたら、<b>黒鉛の g に温度依存の経験オフセットを与えるオプション</b>として実装する。
+        既定にはしない——§6 のとおりそれは物理ではなく当てはめだから。</p>
+    </div>
+
+    <h3 style="font-size:15px;margin:26px 0 10px;">7.2 &nbsp;炭素の基準は入口も出口も黒鉛 — 使い分けない</h3>
+
+    <p>§8.2 の入口温度の検証で、有識者の値が <b>ΔG<sub>dev</sub> ≈ 3.1 kJ/mol</b>（ウィスカー基準相当）で
+      再現できることが分かった。そこで「<b>入口だけウィスカー補正を入れる</b>」という選択肢が出てくるが、
+      <b>既定にはしない</b>と決めた（2026-08-29）。理由は 3 つ。</p>
+
+    <div class="note acc">
+      <p class="h">入口だけ基準を変えない 3 つの理由</p>
+      <ul style="margin:6px 0 0 18px;line-height:1.85;">
+        <li><b>① 同じ反応管の中で基準を使い分けるのは物理的に正当化できない。</b>
+          析出する炭素は管のどこでも同じ物質。ウィスカーが正しい基準なら管全体でウィスカー、
+          黒鉛なら全体で黒鉛。入口だけ変えるのは物理ではなく<b>有識者の数字への合わせ込み</b>で、
+          そう名乗らずに既定にすると後で必ず混乱する。</li>
+        <li><b>② 入口のずれがウィスカー由来だという確認が取れていない。</b>
+          ΔG<sub>dev</sub> 一定（差 4.6%）より <b>ΔT 一定の方がむしろ一貫する</b>（差 2.1%）。
+          しかも必要な 3.1 kJ/mol は §5.1 の 1993 Fig.4 に換算すると余裕わずか 1.6 倍で、
+          <b>貴金属触媒が示す 5〜7 倍（10〜12 kJ/mol）とは桁が違う</b>。
+          CT-CO2AR 系を前提にするならウィスカー補正はもっと大きいはずで、
+          その場合の限界温度は 523 ℃（改質器 A）になり有識者の 465 ℃ から外れる。
+          <b>数字が合うことと機構が正しいことは別</b>。</li>
+        <li><b>③ 出口側との整合が壊れる。</b> 出口は特許 21 点で較正した黒鉛基準の規約
+          （§6 検算 5 のとおりウィスカーでは説明できない）。入口だけ別基準にすると、
+          同じ a<sub>C</sub> という名前の量が場所によって意味の違うものになる。</li>
+      </ul>
+    </div>
+
+    <div class="note acc">
+      <p class="h">決定 — 既定は入口も出口も黒鉛。補正は感度解析として明示的に呼ぶ</p>
+      <p><b>使い方:</b> 入口温度を決めるときは<b>両方の数字を併記する</b>
+        （改質器 A なら「限界は 438 ℃（黒鉛基準）〜463 ℃（有識者相当）」）。
+        保守側に立つなら <b>430 ℃ 以下</b>に置けばどちらの基準でも安全。
+        有識者の 450 ℃ を採るなら、<b>「黒鉛基準では 12 ℃ 超過している、ウィスカー基準を
+        前提にした値だ」と明記した上で</b>採る。そう書いてあれば後から検証できる。</p>
+      <p>補正を使うときは <code>carbon_activity_of(stream, dG_dev=whisker_dG_dev(200))</code> のように
+        <b>呼び出し側で明示する</b>（§5.3）。既定値を書き換えない。</p>
+    </div>
+  </section>
+
+  <!-- ============ 温度依存 ============ -->
+  <section id="tdep">
+    <div class="sec-head">
+      <h2>8 &nbsp;温度依存 — 入口と出口を混同しない</h2>
+      <span class="tag">300 → 875 ℃</span>
+    </div>
+    <p class="cite">生成: <code>examples/example_carbon_activity_vs_T.py</code>（改質器 A〜D の各ケース 1 枚）·
+      条件は <code>examples/example_reformer.py</code> の A〜D</p>
+
+    <p>a<sub>C</sub> は分圧と温度の両方で決まるので、「温度を下げたときどうなるか」は<b>組成をどう扱うかで答えが変わる</b>。
+      同じ図に 3 本描くと関係がはっきりする。</p>
+
+    <figure>
+      <img src="carbon_activity_vs_T_caseC.png" alt="ケース C の炭素活量の温度依存">
+      <figcaption>ケース C（875 ℃・0.417 MPaG・出口 a<sub>C</sub> = 0.90）。実線 = 出口ガスの組成を固定したまま冷やした場合（3 経路と最大値）、破線 = 各温度で再平衡させた場合、点線 = 入口の供給ガス（未反応）。生成: <code>examples/example_carbon_activity_vs_T.py</code></figcaption>
+    </figure>
+
+    <div class="tbl-scroll">
+      <table>
+        <caption>ケース C の数値（875 ℃ / 0.417 MPaG）</caption>
+        <thead><tr><th>T</th><th>出口・組成固定<br>（最大 = Boudouard）</th><th>出口・CH₄ 分解</th><th>各温度で再平衡</th><th>入口の供給ガス</th></tr></thead>
+        <tbody>
+          <tr><td>300 ℃</td><td>6.5e+07</td><td>1.0e−04</td><td>5.66</td><td class="match">0.034</td></tr>
+          <tr><td>400 ℃</td><td>2.9e+05</td><td>1.4e−03</td><td>4.88</td><td class="match">0.452</td></tr>
+          <tr><td>500 ℃</td><td>5.4e+03</td><td>1.0e−02</td><td>4.43</td><td>3.25</td></tr>
+          <tr><td>600 ℃</td><td>2.5e+02</td><td>4.8e−02</td><td>3.60</td><td>15.3</td></tr>
+          <tr><td>700 ℃</td><td>22.2</td><td>0.167</td><td>2.42</td><td>53.6</td></tr>
+          <tr><td>800 ℃</td><td>3.11</td><td>0.466</td><td>1.45</td><td>149.8</td></tr>
+          <tr><td><b>875 ℃</b>（運転点）</td><td class="match"><b>0.90</b></td><td class="match"><b>0.90</b></td><td class="match"><b>0.90</b></td><td>289.2</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="note acc">
+      <p class="h">⚠️ この図を「入口をここまで予熱せよ」と読んではいけない</p>
+      <p>実線が低温で 1 を大きく超えるのは<b>出口ガス</b>の話であって、入口の原料の話ではない。
+        <b>入口の供給ガスは CO を含まない</b>ので、Boudouard（p<sub>CO</sub>²）と CO 還元（p<sub>CO</sub>）は<b>厳密に 0</b>。
+        残るのは CH₄ 分解だけで、これは<b>吸熱</b>なので低温ほど弱い（K<sub>M</sub> は 400 ℃ で 0.066、500 ℃ で 0.47、875 ℃ で 42）。</p>
+      <p>したがって点線が示すとおり、<b>予熱温度を上げるほど入口の a<sub>C</sub> は上がる</b>。400 ℃ で 0.45 → 875 ℃ で 289。
+        <b>予熱を上げることは入口の析出対策にならず、むしろ逆行する。</b></p>
+      <p>実務ともこれで整合する。千代田 WO2012140994A1 表 5 の実施例は 4 例とも
+        <b>リフォーマー入口 500 ℃ / 出口 850〜550 ℃</b>で、<b>低温で入れて管内で昇温させている</b>（§5 の表）。</p>
+      <p><b>a<sub>C</sub> ≤ 1 は「平衡に達した気相（equilibrated gas）」に対する規約</b>であって、管内の各点に課すものではない。
+        入口付近の未反応ガスは定義上どう選んでも 1 を超える（上表の右列）ので、そこは速度論と触媒設計の領域になる（§5）。</p>
+    </div>
+
+    <h3 style="font-size:15px;margin:26px 0 10px;">8.1 &nbsp;では管の途中はどうなのか</h3>
+
+    <p>入口（点線）と出口（実線の右端）が分かっても、<b>その間には温度のグラデーションがある</b>。
+      途中の状態は「そのときの温度 T」と「そこまでにどれだけ反応が進んだか」の 2 つで決まるので、
+      後者を<b>平衡への接近度 f</b>（0 = 未反応のまま、1 = その温度で局所平衡）で表して束にする。</p>
+
+    <p>組成は反応進行度 ξ の 1 次式（n = n<sub>feed</sub> + ν·ξ）なので、供給と局所平衡を f : 1−f で
+      混ぜた点は「平衡の f 倍だけ反応が進んだ状態」そのもので、元素収支も自動的に合う。
+      <b>実際の管内は入口で f ≈ 0、出口で f = 1 に達する経路</b>をたどるので、この束の内側を通る。</p>
+
+    <figure>
+      <img src="carbon_activity_in_tube_caseC.png" alt="ケース C の管内 a_C（接近度を振った束）">
+      <figcaption>ケース C。橙の網かけが a<sub>C</sub> &gt; 1（析出が熱力学的に有利）。<b>どの f を選んでも、管の途中はほぼ全域がこの領域に入る</b>。生成: <code>examples/example_carbon_activity_vs_T.py</code></figcaption>
+    </figure>
+
+    <div class="tbl-scroll">
+      <table>
+        <caption>a<sub>C</sub> &gt; 1 になる温度の窓（f = 1 は局所平衡、f = 0 は未反応のまま昇温した場合）</caption>
+        <thead><tr><th>ケース</th><th>出口</th><th>f = 1（局所平衡）で a<sub>C</sub> &gt; 1 の範囲</th><th>平衡ガスが炭素フリーになる温度</th><th>f = 0（未反応）で a<sub>C</sub> &gt; 1 の範囲</th></tr></thead>
+        <tbody>
+          <tr><td>A</td><td>835 ℃ / 1.41 MPaG</td><td>300 〜 730 ℃</td><td class="match">735 ℃ 以上</td><td>440 〜 835 ℃</td></tr>
+          <tr><td>B</td><td>875 ℃ / 1.41 MPaG</td><td>300 〜 750 ℃</td><td class="match">755 ℃ 以上</td><td>470 〜 875 ℃</td></tr>
+          <tr><td>C</td><td>875 ℃ / 0.417 MPaG</td><td>300 〜 855 ℃</td><td>860 ℃ 以上</td><td>440 〜 875 ℃</td></tr>
+          <tr><td>D</td><td>875 ℃ / 0.1 MPaG</td><td>300 〜 860 ℃</td><td>865 ℃ 以上</td><td>400 〜 875 ℃</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="note acc">
+      <p class="h">結論 — 管の途中は熱力学的には「析出域」を通る。それが普通</p>
+      <p><b>入口が安全で出口が安全なら途中も安全、とはならない。</b> 局所平衡で見ても、
+        a<sub>C</sub> が 1 を下回るのは <b>A で 735 ℃、B で 755 ℃、C で 860 ℃、D で 865 ℃ 以上</b>。
+        つまり<b>管の最後の一部を除いて全域が a<sub>C</sub> &gt; 1</b> で、これは供給の元素組成
+        （O/C・H/C）が決まった時点で決まる熱力学的な性質であって、設計の失敗ではない。
+        a<sub>C</sub> = 0.90 を課しているケース C・D でさえ、そうなるのは出口の 15〜20 ℃ 手前からでしかない。</p>
+      <p>だから <b>a<sub>C</sub> ≤ 1 は「平衡に達した出口ガス」に対する規約</b>として使う。
+        §4 の析出限界線図が “principle of equilibrated gas” と断っているのはこの意味で、
+        管内の各点に課す条件ではない。</p>
+      <p><b>途中を担うのは熱力学ではなく速度論と触媒設計。</b> ここが §5 と §1-1 の話につながる:
+        千代田 CT-CO2AR® の売りは “feed gas conditions on the left side of carbon limit line
+        <b>could be selected because our catalyst has high resistance against carbon formation</b>”
+        ——まさに<b>この途中の領域</b>を触媒耐性で通り抜けるという主張である。
+        黒鉛基準の a<sub>C</sub> はウィスカー炭素に対して 1.5〜7 倍の保守側（§5）で、
+        低温側では実測の析出がさらに少ない（村長 1961: 706 ℃以下では実験値の方が析出しにくい）。</p>
+      <p><b>実務上の効き手</b>は 3 つ。(1) 入口付近を<b>低温で通す</b>（未反応ガスの CH₄ 分解は吸熱なので
+        低温ほど弱い。千代田の実施例も入口 500 ℃）。(2) 入口側の<b>水蒸気を厚くする</b>
+        （村長 1961 の表 6 のとおり、低温では H₂O のほうが CO₂ より効く）。
+        (3) <b>核生成を抑える触媒</b>（貴金属・エッグシェル担持、あるいは硫黄不動態化 = SPARG）。</p>
+    </div>
+
+    <h3 style="font-size:15px;margin:26px 0 10px;">8.2 &nbsp;有識者の見解（伝聞・<b>未検証</b>）— 入口温度は a<sub>C</sub> = 1 で決めている</h3>
+
+    <div class="note">
+      <p class="h">⚠️ 出典は口頭の伝聞。数値の再現・前提の確認はこれから</p>
+      <p>この節は<b>実務者からの伝聞をそのまま記録したもの</b>で、本プロジェクトで検証したものではない。
+        検証したら結果をここに追記すること（記録日 2026-08-28）。</p>
+    </div>
+
+    <p>要点は<b>「入口温度は a<sub>C</sub> = 1 になる温度から逆算して決める」</b>という運転の考え方。
+      伝えられた内容は次の 2 件:</p>
+
+    <div class="tbl-scroll">
+      <table>
+        <caption>伝聞の内容（2026-08-28 記録・未検証）</caption>
+        <thead><tr><th>条件</th><th>入口組成として言及されたもの</th><th>a<sub>C</sub> = 1 となる温度</th><th>採る入口温度</th></tr></thead>
+        <tbody>
+          <tr><td><b>改質器 A</b>（本検討）</td><td>—（A の供給そのもの）</td><td><b>約 465 ℃</b></td><td><b>450 ℃ 程度</b></td></tr>
+          <tr><td><b>chemflow（旧）の pattern1</b><br>※ chemflow2 ではない</td><td>H₂ 9.7 vol% / CO₂ 36.5 vol%（他成分は未確認）</td><td><b>約 525 ℃</b></td><td><b>450 ℃ 程度</b></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p>つまり <b>a<sub>C</sub> = 1 となる温度より 15〜75 ℃ 低いところに入口温度を置く</b>という運用。
+      §7.1 で見たとおり管の途中は熱力学的に析出域を通るが、<b>少なくとも入口（未反応のまま昇温する区間）は
+      a<sub>C</sub> ≤ 1 に収める</b>、という切り方になっている。この考え方自体は §7 の点線（f = 0）の読み方と一致する。</p>
+
+    <div class="note acc">
+      <p class="h">★2026-08-29 検証 — 黒鉛基準では 2 ケースとも 27 ℃ 低い。炭素基準をずらすと合う</p>
+      <p>再現: <code>PYTHONPATH=. python3 -u examples/example_inlet_carbon_limit.py</code></p>
+      <p><b>まず pattern1 の同定ができた。</b> 有識者が挙げた「H₂ 9.7 vol% / CO₂ 36.5 vol%」は
+        <code>example_carbon_limit.py</code> の pattern1 運転点と<b>完全に一致</b>する
+        （CH₄ 23.40 / CO₂ 36.50 / H₂O 30.40 / H₂ 9.70 vol%）。</p>
+      <p><b>入口では CH₄ 分解経路しか効かない。</b> 入口ガスに CO が無いので Boudouard と CO 還元は厳密に 0。
+        千代田の特許の定義（Boudouard 1 本）だと入口の a<sub>C</sub> は 0 になるので、
+        <b>有識者の計算は CH₄ 分解経路を使っている</b>ことが確定した（§8.2 の「最初の確認点」の答え）。</p>
+      <div class="tbl-scroll">
+        <table>
+          <caption>炭素の基準を振ったときの a<sub>C</sub> = 1 温度 [℃]</caption>
+          <thead><tr><th>炭素の基準</th><th>ΔG<sub>dev</sub> [J/mol]</th><th>改質器 A</th><th>pattern1</th><th>A の差</th><th>p1 の差</th></tr></thead>
+          <tbody>
+            <tr><td>黒鉛（既定）</td><td>0</td><td>438.0</td><td>497.5</td><td>−27.0</td><td>−27.5</td></tr>
+            <tr><td><b>Alstrup 黒鉛極限（d→∞）</b></td><td>2600</td><td>459.7</td><td>520.6</td><td class="match">−5.3</td><td class="match">−4.4</td></tr>
+            <tr><td><b>2 点フィット</b></td><td>3053</td><td>463.4</td><td>524.7</td><td class="match">−1.6</td><td class="match">−0.3</td></tr>
+            <tr><td>Alstrup d = 100 nm</td><td>3530</td><td>467.4</td><td>528.9</td><td>+2.4</td><td>+3.9</td></tr>
+            <tr><td>1993 Fig.4 の Ni 余裕 4 倍</td><td>8854</td><td>511.3</td><td>576.0</td><td>+46</td><td>+51</td></tr>
+            <tr><td>同 貴金属 余裕 5〜7 倍</td><td>10279〜12428</td><td>523〜541</td><td>589〜607</td><td>+58〜+76</td><td>+64〜+82</td></tr>
+            <tr><td><b>有識者</b></td><td>—</td><td class="match"><b>465</b></td><td class="match"><b>525</b></td><td>—</td><td>—</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p><b>補正の形の比較。</b> 2 ケースは p<sub>CH₄</sub>/p<sub>H₂</sub>² が 6.757 対 2.208 と 3 倍違うのに、必要な補正量は揃う:</p>
+      <ul style="margin:6px 0 0 18px;line-height:1.85;">
+        <li><b>ΔG<sub>dev</sub> 一定</b>: 3243 / 3092 J/mol — 差 4.6%</li>
+        <li><b>ΔT 一定</b>: +27.0 / +27.5 ℃ — 差 2.1%</li>
+        <li>K<sub>M</sub> 倍率一定: 0.5896 / 0.6275 — 差 6.0%（<b>最も一貫しない</b>＝平衡定数の出典違いでは説明しにくい）</li>
+      </ul>
+      <p><b>注意 — 「ウィスカーだから」と決めつけられない。</b> 必要な ΔG<sub>dev</sub> ≈ 3.1 kJ/mol は
+        §5.1 の 1993 Fig.4 に換算すると<b>黒鉛比の余裕わずか 1.6 倍</b>で、Ni の下限（1.5 倍 = 2.6 kJ/mol）並み。
+        <b>本件が前提にする貴金属触媒の 5〜7 倍（10〜12 kJ/mol）とは桁が違う</b>——それだと限界温度は
+        523〜541 ℃ になり、有識者の 465 ℃ から大きく外れる。
+        つまり有識者の基準は<b>黒鉛にごく近い側</b>で、Alstrup の黒鉛極限 2.6 kJ/mol とほぼ同じ。</p>
+      <p><b>判別に必要なもの。</b> 入口の a<sub>C</sub> は K<sub>M</sub>(T)·Q（Q = p<sub>CH₄</sub>/p<sub>H₂</sub>²）なので
+        <b>限界温度は Q だけで決まる</b>。ΔG 一定と ΔT 一定の差は 500 ℃ 付近で 1 ℃ 未満、
+        300 ℃ 台で 6 ℃、800 ℃ で 9 ℃。<b>限界温度が 300 ℃ 台か 700 ℃ 以上になる条件の値を 1 つ</b>
+        もらえれば決着する。より確実なのは<b>炭素の基準を直接聞く</b>こと。</p>
+      <p>⚠️ 千代田の特許 5 件を全文検索しても「ウィスカー」「黒鉛」「グラファイト」「粒子径」は
+        <b>いずれも 0 件</b>で、炭素の基準についての記載自体が無い。<b>Cantera が持つ固体炭素も
+        C(gr)（黒鉛）と C(d)（ダイヤモンド）だけ</b>で、ウィスカー炭素の熱力学データは存在しない
+        （ダイヤモンドは 465 ℃ で +7.0 kJ/mol と大きすぎ、しかも温度依存が急で合わない）。</p>
+    </div>
+
+    <div class="note acc">
+      <p class="h">実務上の影響 — 判断が分かれるのは改質器 A だけ</p>
+      <div class="tbl-scroll">
+        <table>
+          <caption>入口 450 ℃ を採ったときの判定</caption>
+          <thead><tr><th>ケース</th><th>炭素の基準</th><th>a<sub>C</sub> @450 ℃</th><th>判定</th><th>限界温度</th><th>450 ℃ の余裕</th></tr></thead>
+          <tbody>
+            <tr><td>改質器 A</td><td>黒鉛（既定）</td><td>1.270</td><td><b>析出域</b></td><td>438.0 ℃</td><td>−12.0 ℃</td></tr>
+            <tr><td>改質器 A</td><td>ΔG<sub>dev</sub> = 3053（有識者相当）</td><td>0.764</td><td class="match">安全</td><td>463.4 ℃</td><td>+13.4 ℃</td></tr>
+            <tr><td>pattern1</td><td>黒鉛（既定）</td><td>0.415</td><td class="match">安全</td><td>497.5 ℃</td><td>+47.5 ℃</td></tr>
+            <tr><td>pattern1</td><td>ΔG<sub>dev</sub> = 3053</td><td>0.250</td><td class="match">安全</td><td>524.6 ℃</td><td>+74.6 ℃</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p><b>pattern1 は 450 ℃ でどちらの基準でも安全</b>（黒鉛基準でも 47 ℃ の余裕）。
+        <b>改質器 A だけ</b>が 450 ℃ で黒鉛基準だと 12 ℃ 超過・ウィスカー基準だと 13 ℃ 余裕、
+        という境目に乗っている。<b>基準の選択が実際に効くのはこの 1 ケースだけ</b>。</p>
+      <p><b>推奨（§7.2 の決定）:</b> 既定は黒鉛のまま両方を併記し、
+        保守側なら 430 ℃ 以下。450 ℃ を採るなら前提を明記する。</p>
+    </div>
+
+    <div class="note">
+      <p class="h">（旧記載）本実装との突き合わせ — 近いが 25 ℃ ほどずれる</p>
+      <p>本実装で改質器 A の供給ガス（未反応・組成固定）を昇温したときに a<sub>C</sub> が 1 を横切るのは
+        <b>約 440 ℃</b>（5 ℃ 刻みの計算で 435〜440 ℃ の間）。伝聞の <b>465 ℃</b> に対して
+        <b>本実装のほうが 25 ℃ ほど早く 1 に達する＝保守側</b>。</p>
+      <p>§6 のとおり本実装と千代田の差は温度で符号が変わり（650 ℃ で +11%、850 ℃ で −7%）、
+        <b>一定の系統差として扱えない</b>。仮に 10% の差を当てはめても説明できるのは
+        <b>この 25 ℃ のうち 5 ℃ 程度</b>にとどまる（入口では CH₄ 分解経路が効き、
+        K<sub>M</sub> は 400→500 ℃ で 7.2 倍なので 10% ≒ 4.8 ℃ 相当）。残りは別の要因を疑う必要がある。</p>
+      <p><b>検証で確かめるべきこと:</b></p>
+      <ul style="margin:6px 0 0 18px;line-height:1.85;">
+        <li><b>どの経路で評価しているか。</b> 千代田の定義（Boudouard 1 本）だと<b>入口は CO が無いので a<sub>C</sub> = 0</b> になり、
+          465 ℃ という数字は出ない。したがって伝聞の計算は <b>CH₄ 分解経路</b>を使っているか、
+          <b>入口ガスに CO を含む</b>（循環ガスの混入など）かのどちらか。<b>ここが最初の確認点。</b></li>
+        <li><b>圧力。</b> a<sub>C</sub>(M) = K<sub>M</sub>·p<sub>CH₄</sub>/p<sub>H₂</sub>² は全圧に比例するので、
+          1.41 MPaG と別圧力では横切る温度が大きく動く。</li>
+        <li><b>pattern1 の入口組成の残り</b>（CH₄・H₂O）と圧力。H₂ 9.7 vol% / CO₂ 36.5 vol% だけでは a<sub>C</sub> が決まらない。</li>
+        <li><b>熱力学データ。</b> 千代田系は Stull 1969（§6）。同じ差が入口条件でも出るかを確認する。</li>
+      </ul>
+    </div>
+
+    <div class="note acc">
+      <p class="h">中間帯の a<sub>C</sub> &gt; 1 は「低 S/C を選んだことの代償」— 供給次第で回避できる</p>
+      <p>管の途中が析出域を通るのは<b>供給の元素比が決まった時点で確定</b>するが、
+        <b>どんな供給でもそうなるわけではない</b>。局所平衡の a<sub>C</sub> を 300〜900 ℃ で走査すると:</p>
+      <div class="tbl-scroll">
+        <table>
+          <caption>局所平衡 a<sub>C</sub> の温度走査（300〜900 ℃）</caption>
+          <thead><tr><th>条件</th><th>a<sub>C</sub> 最大</th><th>その温度</th><th>a<sub>C</sub> &gt; 1 の範囲</th></tr></thead>
+          <tbody>
+            <tr><td>改質器 D（S/C 0.256・CO₂/C 0.854・0.1 MPaG）</td><td>7.16</td><td>300 ℃</td><td>300〜860 ℃</td></tr>
+            <tr><td>改質器 A（S/C 1.41・CO₂/C 2.24・1.41 MPaG）</td><td>2.95</td><td>300 ℃</td><td>300〜730 ℃</td></tr>
+            <tr><td>千代田 実施例2 相当（S/C 0.85・CO₂/C 0.82・2.0 MPaG）</td><td>3.15</td><td>300 ℃</td><td>300〜835 ℃</td></tr>
+            <tr><td><b>従来型スチーム改質 S/C 3.0（2.0 MPaG）</b></td><td class="match">0.33</td><td>665 ℃</td><td class="match"><b>なし（全域 1 以下）</b></td></tr>
+            <tr><td>同 S/C 4.0</td><td class="match">0.25</td><td>635 ℃</td><td class="match"><b>なし</b></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p><b>S/C を 3 まで上げれば管内のどこでも a<sub>C</sub> ≤ 1 に収まる。</b> 従来型のスチーム改質が
+        S/C 3〜5 で運転されるのはこのため（§0-4 の冨重 2001 も「リフォーミングでは H₂O/C 2〜5 の
+        スチーム過剰で運転され、この条件では炭素析出が進行しにくい」と述べている）。
+        <b>本件が中間帯で析出域を通るのは、低 S/C・CO₂ 併用という設計を選んだ帰結</b>であって、
+        計算の破綻ではない。そしてそこを通れるようにするのが CT-CO2AR® のような耐炭素析出触媒の役割になる。</p>
+    </div>
+
+    <div class="note">
+      <p class="h">冷却側は「熱力学的には危ない」が、無触媒なら進まない</p>
+      <p>出口ガスを組成固定のまま冷やすと、Boudouard が発熱なので a<sub>C</sub> は桁で跳ね上がる（875 ℃ の 0.90 が 300 ℃ で 6.5×10⁷）。
+        廃熱ボイラや配管がこの領域に当たる。ただし<b>触媒が無ければ速度が伴わない</b>のが実際で、
+        村長 1961 が 706 ℃ 以下で「実験値の方が析出しにくい」と報告しているのはまさにこの領域（§5）。</p>
+      <p>ここは本プロジェクトの a<sub>C</sub> 制約の対象外（制約は改質器出口にのみ課している）。
+        下流で問題になるとすれば熱力学ではなく<b>メタルダスティング等の材料側の話</b>になる。</p>
+    </div>
+
+    <div class="note">
+      <p class="h">なぜ C と D の実線がまったく同じになるのか</p>
+      <p>組成を固定して温度だけ動かすと、経路 i の a<sub>C</sub> は
+        <span class="inl">a<sub>C,i</sub>(T) = a<sub>C,i</sub>(T<sub>out</sub>) × K<sub>i</sub>(T)/K<sub>i</sub>(T<sub>out</sub>)</span> になる。
+        分圧の組み合わせは温度に依らないので約分され、<b>実線は「出口の a<sub>C</sub> の値」と「出口温度」だけで決まる</b>。
+        C と D は圧力も組成も違うが、どちらも a<sub>C</sub> = 0.90 を 875 ℃ で課しているので実線が完全に一致する。
+        一方、破線（再平衡）は組成と圧力に依存するので C と D で違う（300 ℃ で 5.66 対 7.16）。</p>
+    </div>
+  </section>
+
   <!-- ============ 実装 ============ -->
   <section id="impl">
     <div class="sec-head">
-      <h2>6 &nbsp;chemflow2 での実装</h2>
+      <h2>9 &nbsp;chemflow2 での実装</h2>
       <span class="tag">core/carbon_activity.py</span>
     </div>
     <p class="cite"><code>chemflow2/core/carbon_activity.py</code>（計算）・<code>Problem.constrain_carbon_activity</code>（制約）・<code>examples/example_carbon_limit.py</code>（線図）・<code>tests/test_carbon_activity.py</code>（13 件）</p>
@@ -577,27 +1171,37 @@ problem.constrain_carbon_activity(ReactOut, 1.0, T=900, P="1.04MPaG")   # 制約
       <li><span class="f">未入手</span><span class="d">J. R. Rostrup-Nielsen. “Equilibria of decomposition reactions of carbon monoxide and methane over nickel catalysts.” <i>J. Catal.</i> <b>27</b>(3), 343–356 (1972). <a class="doi" href="https://doi.org/10.1016/0021-9517(72)90170-4">10.1016/0021-9517(72)90170-4</a> 〔<b>概念の原著</b>。Ni 上の炭素平衡が黒鉛平衡からずれることを最初に実測。1993 年論文の土台〕</span></li>
       <li><span class="f">未入手</span><span class="d">J. Rostrup-Nielsen, D. L. Trimm. “Mechanisms of carbon formation on nickel-containing catalysts.” <i>J. Catal.</i> <b>48</b>(1), 155–165 (1977). <a class="doi" href="https://doi.org/10.1016/0021-9517(77)90087-2">10.1016/0021-9517(77)90087-2</a> 〔炭素生成機構の体系化。※Crossref は著者を 1 名しか返さないため共著者 Trimm は書誌検索ベース〕</span></li>
       <li><span class="f">未入手</span><span class="d">J. R. Rostrup-Nielsen. “Sulfur-passivated nickel catalysts for carbon-free steam reforming of methane.” <i>J. Catal.</i> <b>85</b>(1), 31–43 (1984). <a class="doi" href="https://doi.org/10.1016/0021-9517(84)90107-6">10.1016/0021-9517(84)90107-6</a> 〔SPARG の基礎。硫黄被覆で炭素核生成を阻害〕</span></li>
-      <li><span class="f">未入手</span><span class="d">N. R. Udengaard, J.-H. Bak Hansen, D. C. Hanson, J. A. Stal. “Sulfur passivated reforming process lowers syngas H₂/CO ratio.” <i>Oil &amp; Gas J.</i> <b>90</b>(10), 62–67 (1992). 〔DOI なし（商業誌）。AIChE 2008 が carbon limit diagram の出典として引く<b>参考文献 4</b>＝線図としての定義の一次出典〕</span></li>
+      <li><span class="f">未入手（2026-08-29 再確認）</span><span class="d">N. R. Udengaard, J.-H. Bak Hansen, D. C. Hanson, J. A. Stal. “Sulfur passivated reforming process lowers syngas H₂/CO ratio.” <i>Oil &amp; Gas J.</i> <b>90</b>(10), 62–67 (Mar. 9, 1992). 〔<b>DOI なし（商業誌）。ISSN 0030-1388、OSTI ID 5650478</b>。著者所属 Haldor Topsøe Inc.（Houston, TX）。<b>千代田が明記している 3 出典の #3</b>（§7.1）。AIChE 2008 が carbon limit diagram の出典として引く<b>参考文献 4</b>＝線図としての定義の一次出典。<b>OSTI（biblio/5650478）にあるのは書誌のみで全文は無い</b>。ただし §4 で図の再現、§6 で千代田の数値との照合ができたため、<b>優先度は下がっている</b>〕</span></li>
       <li><span class="f">未入手</span><span class="d">I. Alstrup. “A new model explaining carbon filament growth on nickel, iron, and Ni–Cu alloy catalysts.” <i>J. Catal.</i> <b>109</b>(2), 241–251 (1988). <a class="doi" href="https://doi.org/10.1016/0021-9517(88)90207-2">10.1016/0021-9517(88)90207-2</a> 〔<b>§5.3 の粒子径補正 ΔG<sub>c,dev</sub> = 2.6 + 93/d の一次候補。ただし当該式がこの論文にあるかは未確認</b>。式自体は二次資料（<i>Appl. Catal. A</i> 2018 の whisker carbon 論文、有料）経由〕</span></li>
     </ul>
 
-    <p class="foot-grp">§4 本プロジェクトでの利用元（千代田化工建設）</p>
+    <p class="foot-grp">§4・§6・§7 本プロジェクトでの利用元（千代田化工建設）</p>
     <ul>
+      <li><span class="f">未入手</span><span class="d">D. R. Stull, E. F. Westrum Jr., G. C. Sinke. <i>The Chemical Thermodynamics of Organic Compounds.</i> John Wiley &amp; Sons, New York (1969), xvii + 865 pp. 〔<b>DOI なし（書籍）。ISBN 0-471-83490-4 / 978-0-471-83490-8</b>（Wiley 原版）、Krieger リプリント <b>ISBN 0-89874-706-5</b>。<b>千代田が明記している 3 出典の #1</b>——特許 5 件すべてが「式（4）および式（5）の平衡定数と温度の関係は、例えば…を参考に求めることができる」として引く<b>唯一の熱力学データ出典</b>（§7.1）。入手経路: Internet Archive <span class="inl">archive.org/details/chemicalthermody0000stul</span>（貸出制）、HathiTrust <span class="inl">catalog.hathitrust.org/Record/001114215</span>、図書館所蔵〕</span></li>
       <li><span class="f">Mikuriya_Yagi_Shimura_2008_AIChE_CO2_H2O_reforming.pdf ✅取得済</span><span class="d">T. Mikuriya, F. Yagi, M. Shimura. “Development of a new Synthesis Gas Production Catalyst and Process with CO₂ and H₂O Reforming.” <i>AIChE Annual Meeting</i>, Philadelphia, PA, Nov. 16–21 (2008), 8 pp. 〔DOI なし（会議発表）。<b>Fig.4 に “Carbon Activity = 1” の等高線</b>。定義式は書かれておらず出典は参考文献 4〕</span></li>
       <li><span class="f">WO2012140994A1_Chiyoda_syngas.pdf ✅取得済</span><span class="d">坂口 順一（千代田化工建設）.「ＣＯ₂を排出しない合成ガスの製造方法」<b>WO2012140994A1</b>（PCT/JP2012/057127）, 優先日 2011-04-12, 公開 2012-10-18, 32 pp. 〔DOI なし（特許）。<b>【0067】〜【0068】（公報 19 頁 / PDF 21 頁目）に定義式「カーボン活性＝Ｋ×（Ｐco)²／（Ｐco2)、Ｋは２ＣＯ＝Ｃ＋ＣＯ₂の反応の平衡定数」と「値が１を超えると触媒上にカーボンが析出しやすくなる」を明記＝千代田自身の定義が確認できる唯一の資料</b>。<b>表 5（公報 20 頁）は実施例 1〜4 の出口カーボン活性をいずれも 0.90 と設計</b>。⚠️ 保存 PDF は全 32 頁ともスキャン画像でテキスト層なし（位置は画像化して目視特定）。⚠️ <b>Google Patents は当該箇所を【0091】/ 全 92 段落と表示するが誤り</b>——本公報の明細書は【0075】で終わる〕</span></li>
-      <li><span class="f">未入手</span><span class="d">八木 冬樹. 「CO₂ を原料として合成ガスを製造する CO₂/H₂O リフォーミングプロセス」<i>触媒</i> <b>51</b>(5), 331–335 (2009). 〔DOI なし。日本語版。非オープンアクセス〕</span></li>
+      <li><span class="f">JP2012219068A.pdf ✅取得済</span><span class="d">「高効率メタノール製造方法」<b>JP2012-219068A</b>（チヨダ）. 〔<b>§6 の照合に使った実施例 4 点（実施例 1・2、比較例 3・4）</b>。定義式は WO2012140994A1 と同一。<b>平衡定数の出典を「D. R. Stull et al., <i>The Chemical Thermodynamics of Organic Compounds</i>, John Wiley (1969)」と明記</b>。直リンク <span class="inl">patentimages.storage.googleapis.com/53/50/11/690a2762376969/JP2012219068A.pdf</span>〕</span></li>
+      <li><span class="f">JP2004210626A.pdf ✅取得済</span><span class="d">「合成ガス製造の運転方法」<b>JP2004-210626A</b>（石油公団 + 千代田化工建設）. 〔同じ定義式・同じ Stull 1969。<b>ただし使い方が逆で、Ac &gt; 1 で運転して意図的に析出させ、Ac &lt; 1（0.01〜0.99、より好適には 0.01〜0.8）で触媒を再生する</b>運転方法の特許。直リンク <span class="inl">patentimages.storage.googleapis.com/85/26/61/31621dc7a121e4/JP2004210626A.pdf</span>〕</span></li>
+      <li><span class="f">Google Patents で確認</span><span class="d"><b>JP5738658B2</b>「高効率メタノール製造方法」（千代田化工建設）/ <b>JP5738743B2</b>・<b>JP2013-103909A</b>「メタノールプラントを利用した酢酸原料又は MMA 原料の製造方法」（チヨダ / Chiyoda Corp）. 〔<b>推奨範囲 0.36 ≤ Ac ≤ 1.0 の記載元</b>。JP5738743B2 の実施例 2 点も §6 の照合に使用〕</span></li>
+      <li><span class="f">未入手（2026-08-28 再確認）</span><span class="d">八木 冬樹. 「CO₂ を原料として合成ガスを製造する CO₂/H₂O リフォーミングプロセス」<i>触媒</i> <b>51</b>(5), 331–335 (2009). 〔DOI なし。日本語版。<b>触媒学会誌『触媒』は J-STAGE 未収録</b>で、電子的な入手経路が無い。国会図書館の遠隔複写か学会の会員向けアーカイブによる〕</span></li>
       <li><span class="f">未入手</span><span class="d">八木 冬樹. 「CO₂ を原料とする合成ガス製造プロセス」<i>ペトロテック</i> <b>34</b>(6), 378–383 (2011). 〔DOI なし。日本語版。非オープンアクセス〕</span></li>
       <li><span class="f">未入手</span><span class="d">八木 冬樹. 「CO₂ リフォーミングプロセスによる合成ガス製造」<i>日本エネルギー学会誌</i> <b>91</b>(4), 274–278 (2012). 〔DOI なし。日本語版。CiNii CRID 1520290882653584768。非オープンアクセス〕</span></li>
     </ul>
 
     <p class="foot-grp">§5 実測との照合（オープンアクセス）</p>
     <ul>
-      <li><span class="f">muraosa1961_carbon_deposition.pdf ✅取得済</span><span class="d">村長 潔. 「メタン-水蒸気-炭酸ガス反応における炭素析出とモル比」<i>工業化学雑誌</i> <b>64</b>(11), 1933–1938 (1961). <a class="doi" href="https://doi.org/10.1246/nikkashi1898.64.11_1933">10.1246/nikkashi1898.64.11_1933</a> 〔J-STAGE 無料。595–982 ℃ で析出曲線の実験値と平衡計算値を直接比較。<b>816 ℃以上なら平衡計算で予測してよい</b>根拠。本プロジェクトの 850–900 ℃ はこの範囲内〕</span></li>
-      <li><span class="f">tomishige2001_co2_reforming.pdf ✅取得済</span><span class="d">冨重 圭一, 藤元 薫. 「メタンの炭酸ガスリフォーミング反応による合成ガス製造における触媒特性と炭素析出挙動解析 — NiO-MgO 固溶体触媒の開発」<i>石油学会誌</i> <b>44</b>(2), 65–79 (2001). <a class="doi" href="https://doi.org/10.1627/jpi1958.44.65">10.1627/jpi1958.44.65</a> 〔J-STAGE 無料。常圧では耐炭素析出だが<b>高圧では対策が必要</b>と報告。本件は 1.04 MPaG 運転なので関連〕</span></li>
+      <li><span class="f">muraosa1961_carbon_deposition.pdf ✅取得済・全文確認</span><span class="d">村長 潔（東北肥料）. 「メタン-水蒸気-炭酸ガス反応における炭素析出とモル比」<i>工業化学雑誌</i> <b>64</b>(11), 1933–1938 (1961). <a class="doi" href="https://doi.org/10.1246/nikkashi1898.64.11_1933">10.1246/nikkashi1898.64.11_1933</a> 〔J-STAGE 無料・全 6 頁・OCR テキスト層あり（誤変換が多く目視補正が要る）。「天然ガスより合成ガス製造における炭素析出の研究（第 9 報）」。<br>
+      <b>§2 の一次的な裏づけ:</b> 活量比 A₃ = a<sub>CH₄</sub>/a<sub>H₂</sub>²（本実装 M）・A₄ = a<sub>CO</sub>·a<sub>H₂</sub>/a<sub>H₂O</sub>（同 R）・A₅ = a<sub>CO</sub>²/a<sub>CO₂</sub>（同 B）を K₃・K₄・K₅ で切った交点から最小水蒸気量を求め、<b>「同じ値が得られる」と明記</b>＝<b>3 経路の一致を 1961 年に実演している</b>。<b>a<sub>C</sub> = 1 を課して最小水蒸気量を解く</b>という本実装の制約の使い方とも一致。<br>
+      <b>§5 の実測根拠:</b> 595 / 706 / 816 / 926 ℃ で析出炭素を燃焼→CO₂ 定量し、析出量 0 への外挿で限界点を決めている（実験 32 点、表 4）。結論は「<b>816 ℃以上では実験値と理論値はほぼ一致、706 ℃以下では実験値の方が低い</b>」。理由づけも「816 ℃以上ではすべての反応がほとんど平衡に達する」と本実装の前提と同じ。<br>
+      <b>副次:</b> 低温ほど H₂O/CH₄ の影響が CO₂/CH₄ より大きく、高温では両者の影響が等しくなる（表 6 の C<sub>R</sub> が 1 に近づく）〕</span></li>
+      <li><span class="f">tomishige2001_co2_reforming.pdf ✅取得済・全文確認</span><span class="d">冨重 圭一, 藤元 薫（東京大学）. 「メタンの炭酸ガスリフォーミング反応による合成ガス製造における触媒特性と炭素析出挙動解析 — NiO-MgO 固溶体触媒の開発」<i>石油学会誌</i> <b>44</b>(2), 65–79 (2001). <a class="doi" href="https://doi.org/10.1627/jpi1958.44.65">10.1627/jpi1958.44.65</a> 〔J-STAGE 無料・全 15 頁・テキスト層あり。<br>
+      <b>使える点:</b> 「炭素析出量は反応条件に大きく依存しており、高温では比較的少なく、<b>高圧では炭素析出量は顕著に増加する</b>」。CO₂ リフォーミングは原子比が H/C = 2・O/C = 1（CO₂/CH₄ = 1）ないし H/C = 4/3・O/C = 4/3（同 2）で、スチームリフォーミングより小さく、<b>「反応ガス中の炭酸ガス分圧を上げたとしても、平衡的に炭素析出を抑制することが困難」</b>——CO₂ だけでなく H₂O を併用する本件の前提と整合する。加圧下の触媒評価報告は少ないとも述べる。<br>
+      <b>⚠️ 扱っていないこと:</b> 全文検索で <span class="inl">炭素活量</span> 0 件 / <span class="inl">活量</span> 0 件 / <span class="inl">熱力学</span> 0 件。<b>a<sub>C</sub> という量そのものは使っていない</b>ので、判定基準の根拠にはならない。<b>「加圧は析出側に効く」の定性的裏づけ</b>として使う〕</span></li>
     </ul>
 
     <p class="foot-grp">二次資料（無料・要注意）</p>
     <ul>
+      <li><span class="f">✅取得済（無料フルテキスト）</span><span class="d">L. Basini, L. Piovesan (Snamprogetti). “Reduction on Synthesis Gas Costs by Decrease of Steam/Carbon and Oxygen/Carbon Ratios in the Feedstock.” <i>Ind. Eng. Chem. Res.</i> <b>37</b>(1), 258–266 (1998). 〔低 S/C 化の<b>経済性</b>の分析（300,000 Nm³/h 規模）。SPARG は S/C = 0.6 で H₂/CO = 0.88 と記載。<b>Udengaard 1992 と Rostrup-Nielsen 1984/1993 を引用している数少ない無料資料</b>だが、<b>全文検索で <span class="inl">carbon activity</span> 0 件 / <span class="inl">whisker</span> 0 件 / <span class="inl">graphite</span> 0 件 / <span class="inl">O/C</span>（原子比としての表記）0 件</b>で、a<sub>C</sub> の定義には踏み込まない。<b>「低 S/C にしたい動機」の裏づけ用</b>。入手先 <span class="inl">lib3.dss.go.th/fulltext/Journal/Ind.Eng.Chem.Res/1998v37no.1-2/no.1/1998v37no1p258-266.pdf</span>（http のみ）〕</span></li>
       <li><span class="f">PNNL-16950_tar_reforming_catalyst_review.pdf ✅取得済</span><span class="d">R. A. Dagle 他. “Review of Novel Catalysts for Biomass Tar Cracking and Methane Reforming.” <b>PNNL-16950</b>, Pacific Northwest National Laboratory (2007). 〔DOI なし。<b>米国政府技術レポート＝無料で誰でも入手でき、引用も再配布も自由</b>という点に価値がある。<br>
       <b>性質:</b> バイオマスガス化のタール改質<b>触媒</b>レビュー。目次は 1 序論 / 2 貴金属触媒によるメタン改質 / 3 代替 Ni 系触媒 / 4 代替触媒によるタール分解 / 5 結論。<br>
       <b>どこまで書かれているか:</b> Rostrup-Nielsen &amp; Bak Hansen 1993 については<b>§2 の数段落で実験条件と結果を要約するのみ</b>（調製法、担体、TOF 比、炭素析出の有無）。要約自体は正確で、TOF 比（Ni 1.4–1.6 / Rh 4.3 / Ru 3.1 / Ir 10.2 / Pd 8.9 / Pt 5.6）は原著 Table 2 と一致する。<br>
@@ -610,7 +1214,10 @@ problem.constrain_carbon_activity(ReactOut, 1.0, T=900, P="1.04MPaG")   # 制約
     <ul>
       <li><span class="f">chemflow2/core/carbon_activity.py</span><span class="d">a<sub>C</sub> の計算（3 経路・平衡定数・Stream からの評価）</span></li>
       <li><span class="f">chemflow2/core/problem.py</span><span class="d"><code>Problem.constrain_carbon_activity</code>（対数残差）</span></li>
-      <li><span class="f">examples/example_carbon_limit.py</span><span class="d">析出限界線図の生成と原論文 Fig.4 との照合</span></li>
+      <li><span class="f">examples/example_carbon_limit.py</span><span class="d">析出限界線図の生成と原論文 Fig.4 との照合（§4）</span></li>
+      <li><span class="f">examples/example_chiyoda_patent_check.py</span><span class="d">千代田の特許の実施例 6 点との照合（§6）と、298.15 K の生成ギブズによる熱力学データの確認</span></li>
+      <li><span class="f">examples/example_inlet_carbon_limit.py</span><span class="d">入口ガスの a<sub>C</sub> = 1 温度と、有識者の値（465 / 525 ℃）との突き合わせ（§8.2）</span></li>
+      <li><span class="f">examples/example_carbon_activity_vs_T.py</span><span class="d">改質器 A〜D の a<sub>C</sub> の温度依存図（§8。出口・組成固定 / 再平衡 / 入口供給の 3 本）</span></li>
       <li><span class="f">tests/test_carbon_activity.py</span><span class="d">平衡定数の検算・3 経路の一致・制約の自由度・限界の求解（13 件）</span></li>
       <li><span class="f">references/PAPERS_INDEX.md</span><span class="d">文献調査の記録（探索したキーワードと入手状況）</span></li>
     </ul>
