@@ -22,6 +22,13 @@ GibbsReactor の出口はこれに当たり、値は一意。非平衡の気相�
 気相は `gri30.yaml`、固体炭素は `graphite.yaml`（相 `C(gr)`）。
 Cantera はオプション依存: `pip install chemflow2[gibbs]`
 
+**炭素の基準**: 既定は純黒鉛（a = 1）。触媒上に実際に育つのは黒鉛ではなく**ウィスカー
+（フィラメント）状炭素**で、黒鉛より不安定＝ギブズエネルギーが ΔG_dev だけ高い。その基準に
+切り替えるには `dG_dev` [J/mol] を渡す（`whisker_dG_dev()` が Alstrup の式で値を作る）。
+ΔG_dev は**固体炭素側の量なので 3 経路すべてに同じ係数 exp(−ΔG_dev/RT) が掛かり**、
+平衡気相で 3 経路が一致する性質は保たれる。K_B だけを弄ると一致が壊れるので、
+補正は必ずこちらの形で入れること（`references/carbon_activity.html` §7 参照）。
+
 ⚠️ この判定は**気相が完全平衡に達している前提**の工学的判定（"equilibrated gas"）。
    実際の改質管の入口付近など気相が平衡していない領域の局所的な析出リスクまでは
    保証しない。千代田化工の耐炭素析出触媒が効くのはまさにその速度論的な領域で、
@@ -44,6 +51,31 @@ _GRAPHITE = "graphite.yaml"
 _SPECIES = ("CH4", "CO", "CO2", "H2", "H2O")
 
 _cache: dict[float, tuple[float, float, float]] = {}
+
+#: 気体定数 [J/(mol·K)]
+R_GAS = 8.314462618
+
+
+def whisker_dG_dev(d_nm: float | None = None) -> float:
+    """ウィスカーカーボン基準にするための ΔG_dev [J/mol] を返す。
+
+        ΔG_dev = 2.6 + 93 / d(nm)   [kJ/mol]        (Alstrup)
+
+    d_nm を省略すると **黒鉛極限の 2.6 kJ/mol**（d → ∞）。
+
+    ⚠️ **この式は Ni（および Ni-Cu・Ni-Fe）専用**で、一次資料での確認も取れていない
+       （出所は二次資料）。貴金属担持触媒に当てる根拠は無い。既定では使わない。
+       経緯と不採用の理由は `references/carbon_activity.html` §5.3。
+
+    ⚠️ 有識者の入口温度の値（改質器 A で 465 ℃、pattern1 で 525 ℃）は
+       **ΔG_dev ≈ 3.0〜3.2 kJ/mol**（d ≈ 200〜300 nm 相当）で再現できる。
+       ただし出典は未確認で、仮説の域を出ない（同 §8.2）。
+    """
+    if d_nm is None:
+        return 2600.0
+    if d_nm <= 0:
+        raise ValueError(f"粒子径は正の値にしてください: {d_nm}")
+    return (2.6 + 93.0 / float(d_nm)) * 1000.0
 
 
 def equilibrium_constants(T_celsius: float) -> tuple[float, float, float]:
@@ -74,11 +106,15 @@ def equilibrium_constants(T_celsius: float) -> tuple[float, float, float]:
 
 
 def carbon_activity(p_atm: dict[str, float], T_celsius: float, *,
-                    per_route: bool = False):
+                    per_route: bool = False, dG_dev: float = 0.0):
     """分圧 [atm] の気相の炭素活量。
 
     per_route=True なら {経路名: a_C} を返す（平衡していない気相の診断用）。
     既定は 3 経路の最大値（保守側）。
+
+    dG_dev [J/mol] は**析出する炭素が黒鉛よりどれだけ不安定か**。0（既定）が黒鉛基準。
+    正の値を入れると a_C は exp(−ΔG_dev/RT) 倍だけ下がる（＝析出しにくい判定になる）。
+    `whisker_dG_dev()` を使うとウィスカー基準の値が作れる。
     """
     K_B, K_M, K_R = equilibrium_constants(T_celsius)
     p = {s: max(float(p_atm.get(s, 0.0)), 0.0) for s in _SPECIES}
@@ -88,18 +124,26 @@ def carbon_activity(p_atm: dict[str, float], T_celsius: float, *,
         "CH4_cracking": K_M * p["CH4"] / max(p["H2"] ** 2, tiny),
         "CO_reduction": K_R * p["CO"] * p["H2"] / max(p["H2O"], tiny),
     }
+    if dG_dev:
+        # 固体炭素側の量なので**全経路に同じ係数**が掛かる。3 経路の一致は保たれる。
+        f = math.exp(-float(dG_dev) / (R_GAS * (float(T_celsius) + 273.15)))
+        routes = {k: v * f for k, v in routes.items()}
     return routes if per_route else max(routes.values())
 
 
 def carbon_activity_of(stream, T: float | None = None,
-                       P: float | str | None = None, *, per_route: bool = False):
+                       P: float | str | None = None, *, per_route: bool = False,
+                       dG_dev: float = 0.0):
     """Stream の組成から炭素活量を計算する。
 
     T [°C] と P を省略すると stream.condition の値を使う。GibbsReactor の出口の
     ように気相が平衡していれば 3 経路は一致するので、値は一意。
 
-        a = carbon_activity_of(ReactOut)          # 出口条件で評価
+        a = carbon_activity_of(ReactOut)          # 出口条件で評価（黒鉛基準）
         a = carbon_activity_of(ReactOut, T=900)   # 温度だけ差し替え
+
+        # ウィスカー基準（Ni 粒子径 200 nm 相当）で評価する
+        a = carbon_activity_of(ReactOut, dG_dev=whisker_dG_dev(200))
     """
     T = T if T is not None else stream.condition.T
     P = P if P is not None else stream.condition.P
@@ -111,4 +155,4 @@ def carbon_activity_of(stream, T: float | None = None,
         raise CanteraError(f"{stream.name!r} の総流量が 0 なので分圧を定義できません")
     P_atm = parse_pressure(P) / 101325.0
     p_atm = {f: stream.flow_of(f) / total * P_atm for f in _SPECIES if f in stream.index}
-    return carbon_activity(p_atm, T, per_route=per_route)
+    return carbon_activity(p_atm, T, per_route=per_route, dG_dev=dG_dev)

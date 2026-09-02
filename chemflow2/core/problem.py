@@ -231,6 +231,7 @@ class Problem:
         *,
         T: float | None = None,
         P: float | str | None = None,
+        dG_dev: float = 0.0,
         name: str | None = None,
     ) -> None:
         """ストリームの**炭素活量を指定値に固定する**（方程式 1 本）。
@@ -248,6 +249,9 @@ class Problem:
         解いた後の検算には `chemflow2.core.carbon_activity.carbon_activity_of` を
         直接呼べばよい（制約にせず値だけ見る場合）。
 
+        dG_dev [J/mol] で炭素の基準を黒鉛からずらせる（既定 0 = 黒鉛）。
+        `chemflow2.core.carbon_activity.whisker_dG_dev` を参照。
+
         残差は **log(a_C) − log(value)** を使う。a_C は組成しだいで 1e±30 まで振れ、
         差の形だと反復の途中で overflow して解けない（分母の分圧が 0 に近づくため）。
         零点は同じで、条件数だけが桁違いに良くなる。
@@ -258,7 +262,7 @@ class Problem:
         tiny = 1e-300
 
         def fn() -> np.ndarray:
-            a = carbon_activity_of(stream, T=T, P=P)
+            a = carbon_activity_of(stream, T=T, P=P, dG_dev=dG_dev)
             return np.atleast_1d(np.log(max(a, tiny)) - log_target)
 
         self.constraints.append(

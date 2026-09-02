@@ -7,9 +7,11 @@ pytest.importorskip("cantera")
 
 from chemflow2 import GibbsReactor, Problem, Stream, StreamCondition
 from chemflow2.core.carbon_activity import (
+    R_GAS,
     carbon_activity,
     carbon_activity_of,
     equilibrium_constants,
+    whisker_dG_dev,
 )
 from chemflow2.core.errors import CanteraError, ConstraintError
 
@@ -152,3 +154,74 @@ def test_constraint_residual_is_logarithmic():
     r = float(p.constraints[-1].residuals()[0])
     assert r == pytest.approx(np.log(carbon_activity_of(out)), rel=1e-12)
     assert r < 0                                       # a_C < 1 なので負
+
+
+# --- 炭素の基準（ウィスカー補正） ------------------------------------- #
+def test_whisker_dG_dev_matches_alstrup_formula():
+    """ΔG_dev = 2.6 + 93/d [kJ/mol]。d 省略で黒鉛極限 2.6 kJ/mol。"""
+    assert whisker_dG_dev() == pytest.approx(2600.0)
+    assert whisker_dG_dev(100) == pytest.approx((2.6 + 0.93) * 1000)
+    assert whisker_dG_dev(200) == pytest.approx((2.6 + 0.465) * 1000)
+    with pytest.raises(ValueError):
+        whisker_dG_dev(0)
+
+
+def test_whisker_basis_lowers_activity_by_boltzmann_factor():
+    """ΔG_dev を入れると a_C はちょうど exp(−ΔG_dev/RT) 倍になる。"""
+    p_atm = {"CH4": 3.0, "H2": 0.7, "CO": 0.0, "CO2": 1.0, "H2O": 2.0}
+    T = 465.0
+    base = carbon_activity(p_atm, T)
+    dG = 3000.0
+    shifted = carbon_activity(p_atm, T, dG_dev=dG)
+    assert shifted == pytest.approx(base * np.exp(-dG / (R_GAS * (T + 273.15))))
+    assert shifted < base          # 不安定な炭素基準 = 析出しにくい判定
+
+
+def test_whisker_basis_keeps_three_routes_coincident():
+    """ΔG_dev は固体側の量なので、平衡気相での 3 経路の一致は保たれる。
+
+    K_B だけを弄ると一致が壊れる（references/carbon_activity.html §7）。
+    """
+    Feed = Stream(SPECIES, name="Feed",
+                  flows={"CH4": 1.0, "CO2": 0.25, "H2O": 1.5, "CO": 0.0, "H2": 0.0})
+    Out = Stream(SPECIES, name="Out", guess={"CO": 1.0, "H2": 2.0, "CO2": 0.2,
+                                             "CH4": 0.1, "H2O": 0.5})
+    pb = Problem(streams=[Feed, Out],
+                 units=[GibbsReactor(inlet=Feed, outlet=Out, species=SPECIES,
+                                     T=875.0, P="2MPaG")])
+    assert pb.solve(tol=1e-9).success
+    routes = carbon_activity_of(Out, T=875.0, P="2MPaG", per_route=True,
+                                dG_dev=whisker_dG_dev(200))
+    lo, hi = min(routes.values()), max(routes.values())
+    assert (hi - lo) / hi < 1e-9
+
+
+def test_constraint_accepts_whisker_basis():
+    """constrain_carbon_activity も同じ基準で解ける。
+
+    炭素が黒鉛より不安定なほうが析出しにくいので、**同じ H2/CO を保つのに必要な
+    最小水蒸気量は減る**。構成は test_constraint_solves_the_carbon_limit と同じ。
+    """
+    from chemflow2 import Mixer
+
+    def limit(dG_dev):
+        T = 900.0
+        hot = StreamCondition(T=T, P=P, phase="gas")
+        rg = Stream(["H2", "CH4"], name="RG", condition=hot,
+                    flows={"H2": 0.885957, "CH4": 2.137257})
+        co2f = Stream(["CO2"], name="CO2f", condition=hot, guess={"CO2": 2.0})
+        h2of = Stream(["H2O"], name="H2Of", condition=hot, guess={"H2O": 1.0})
+        mixed = Stream(["H2", "CO2", "CH4", "H2O"], name="Mixed", condition=hot)
+        out = Stream(SPECIES, name="ReactOut", condition=hot,
+                     guess={"CO": 3.5, "H2": 4.9, "CO2": 1.7, "CH4": 0.25, "H2O": 1.0})
+        pb = Problem(streams=[rg, co2f, h2of, mixed, out],
+                     units=[Mixer([rg, co2f, h2of], mixed),
+                            GibbsReactor(inlet=mixed, outlet=out, species=SPECIES,
+                                         T=T, P=P)])
+        pb.constrain(out.flow_expr("H2"), 1.3837259 * out.flow_expr("CO"))
+        pb.constrain_carbon_activity(out, 1.0, T=T, P=P, dG_dev=dG_dev)
+        assert pb.solve().success
+        assert carbon_activity_of(out, T=T, P=P, dG_dev=dG_dev) == pytest.approx(1.0, rel=1e-6)
+        return h2of.flow_of("H2O")
+
+    assert limit(whisker_dG_dev(200)) < limit(0.0)
