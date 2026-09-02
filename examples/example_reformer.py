@@ -122,6 +122,10 @@ plant4 は未反応 DME をあえて循環させる設計なので、ループ C
     PYTHONPATH=. python3 -u examples/example_reformer.py
     PYTHONPATH=. python3 -u examples/example_reformer.py --cases A,D
 
+■ a_C の温度依存グラフ（A〜D 各 1 枚の PNG）
+
+    PYTHONPATH=. python3 -u examples/example_carbon_activity_vs_T.py
+
 ■ 下流まで通す（reaction_rate も要る）
 
     PYTHONPATH=.:../reaction_rate/src python3 -u examples/example_reformer_plant3.py
