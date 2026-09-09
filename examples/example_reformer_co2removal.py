@@ -94,6 +94,25 @@ PYTHONPATH の "." は examples.example_plant3 を絶対 import するため、
     set OPENBLAS_NUM_THREADS=1
     python -u examples\example_reformer_co2removal.py --reform A --cases baseline,a_upstream,b_recycle --eta 0.5,0.9,0.99 --solve-tol 1e-4 --stop-at-tol
 
+■ メタノール合成の速度論モデル（--synthesis-model）
+
+R1 ハイブリッド床の合成側は **既定が VBF**（Vanden Bussche–Froment 1996 原著の前指数）。
+`--synthesis-model KOGAS` で Ng 1999（= KOGAS 2008/2021 掲載値）に戻せる。式形も活性化
+エネルギー B も両者共通で、**違うのは前指数 A だけ**（同一単位では KOGAS ≈ 0.43×VBF）。
+
+既定を VBF にしたのは、原著 FIG.5（断熱ベンチ反応器）の再現検証が取れているのが
+こちらだから（reaction_rate/examples/vbf_fig5.py）。
+
+改質 A・baseline で両モデルを解いた実測差（KOGAS → VBF）:
+
+    plant3: 酢酸メチル +2.2% / 炭素収率 78.8→80.5% / CO パージ損失 −21% / 触媒体積 −2.8%
+    plant4: 酢酸メチル +0.4% / 炭素収率 80.8→81.2% / CO パージ損失 −5%  / 触媒体積 −0.6%
+
+単流で見た差はもっと大きい（R1 出口 DME が 15.8→21.4 mol%）が、パージ 5% の高循環比
+ループが吸収するのでプラント指標には波及しない。**⚠ 出力ファイル名はモデルで変わらない**
+ので、両モデルを比べるときは片方の出力を別ディレクトリに退避してから回すこと
+（どちらで回したかは metrics JSON の "synthesis_model" に残る）。
+
 ■ 所要時間（実測ベースの見込み）
 
 新しい改質条件での plant3 は 1 ケース平均 2.5 分（--stop-at-tol + x_scale jac の効果）。
@@ -402,13 +421,16 @@ def report_caustic(label: str, gas_in: dict[str, float], eta: float, *, name: st
 def run_case(tag: str, eta: float, purge: float, reform: dict, label: str,
              solve_tol: float = 1e-6, progress_every: int = 0,
              stop_at_tol: bool = False, solver_tols: float = 1e-12,
-             x_scale: str | float = "jac") -> dict:
+             x_scale: str | float = "jac",
+             synthesis_model: str = p3.SYNTHESIS_MODEL) -> dict:
     """1 ケース解いて、改質側 + plant3 側の指標を返す。
 
     tag は "baseline" / "a_upstream" / "b_recycle"、label は出力ファイル名の接頭辞。
     solve_tol は plant3 の残差ノルム判定（p3.solve_with_sv 参照）。
+    synthesis_model は R1 のメタノール合成速度論（"VBF" 既定 / "KOGAS"）。
     """
-    print(f"\n{'=' * 78}\n=== {label}（η={eta:.0%}, パージ率={purge:.0%}）\n{'=' * 78}")
+    print(f"\n{'=' * 78}\n=== {label}（η={eta:.0%}, パージ率={purge:.0%}, "
+          f"合成速度論={synthesis_model}）\n{'=' * 78}")
 
     # --- 前工程（改質器）。(a) のときだけ改質器側に T-100 を置く ---
     ref_removal = eta if tag == "a_upstream" else None
@@ -439,7 +461,8 @@ def run_case(tag: str, eta: float, purge: float, reform: dict, label: str,
                                                progress_every=progress_every,
                                                stop_at_tol=stop_at_tol,
                                                solver_tols=solver_tols,
-                                               solver_kwargs={"x_scale": x_scale})
+                                               solver_kwargs={"x_scale": x_scale},
+                                               synthesis_model=synthesis_model)
     by_name = {s.name: s for s in problem.streams}
     Steam1, ReactorIn = by_name["1. Steam1"], by_name["2. ReactorIn"]
     Purge, MA = by_name["7. Purge"], by_name["9. MethylAcetate"]
@@ -484,7 +507,8 @@ def run_case(tag: str, eta: float, purge: float, reform: dict, label: str,
 
 
 def write_metrics(label: str, tag: str, eta: float, metrics: dict, *,
-                  plant: str, reform: str, note: str = "") -> None:
+                  plant: str, reform: str, note: str = "",
+                  synthesis_model: str = p3.SYNTHESIS_MODEL) -> None:
     """指標を xlsx の隣に JSON で残す。
 
     サマリ集計（merge_all_cases.py）は元々この指標を**標準出力の比較表**から
@@ -500,6 +524,7 @@ def write_metrics(label: str, tag: str, eta: float, metrics: dict, *,
     with open(path, "w", encoding="utf-8") as f:
         json.dump({"label": label, "plant": plant, "reform": reform,
                    "case": tag, "eta": eta, "note": note,
+                   "synthesis_model": synthesis_model,
                    "metrics": metrics}, f, ensure_ascii=False, indent=1)
 
 
@@ -539,6 +564,14 @@ def main():
                          "（plant4 版は既定 1e-4）")
     ap.add_argument("--retry-tol", type=float, default=1e-5,
                     help="1 回目が収束判定を外したときに使う緩和 solve_tol（既定 1e-5）")
+    ap.add_argument("--synthesis-model", choices=("VBF", "KOGAS"),
+                    default=p3.SYNTHESIS_MODEL,
+                    help=f"R1 のメタノール合成速度論（既定 {p3.SYNTHESIS_MODEL}）。"
+                         "VBF=Vanden Bussche–Froment 1996 原著 / "
+                         "KOGAS=Ng 1999(=KOGAS 掲載値)。式形は同じで前指数 A だけが違い、"
+                         "同一単位では KOGAS ≈ 0.43×VBF の活性。⚠ 出力ファイル名は"
+                         "モデルで変わらないので、両方を比べるなら片方を別ディレクトリに"
+                         "退避してから回すこと")
     args = ap.parse_args()
 
     if args.reform not in rf.CASES:
@@ -562,7 +595,8 @@ def main():
                 plan.append((tag, eta, f"R{args.reform}_{tag}_eta{eta:g}"))
 
     print(f"実行計画: {len(plan)} runs（plant3 は 1 run 約 10 分 → 約 "
-          f"{len(plan) * 10} 分, solve_tol={args.solve_tol:g}）")
+          f"{len(plan) * 10} 分, solve_tol={args.solve_tol:g}, "
+          f"合成速度論={args.synthesis_model}）")
     for _tag, eta, label in plan:
         print(f"  - {label}  η={eta:.0%}")
 
@@ -588,9 +622,11 @@ def main():
                                       progress_every=args.progress_every,
                                       stop_at_tol=args.stop_at_tol,
                                       solver_tols=args.solver_tols,
-                                      x_scale=xs)
+                                      x_scale=xs,
+                                      synthesis_model=args.synthesis_model)
             write_metrics(label, tag, eta, results[label],
-                          plant="plant3", reform=args.reform)
+                          plant="plant3", reform=args.reform,
+                          synthesis_model=args.synthesis_model)
             print(f"[{i}/{len(plan)}] {label} 完了 ({time.time() - t0:.0f}s)")
         except Exception as e:                      # noqa: BLE001 — 打ち切らず続行
             print(f"[{i}/{len(plan)}] {label} 1回目失敗: {type(e).__name__}: {e}")
@@ -601,10 +637,12 @@ def main():
                                           progress_every=args.progress_every,
                                           stop_at_tol=args.stop_at_tol,
                                           solver_tols=args.solver_tols,
-                                          x_scale=xs)
+                                          x_scale=xs,
+                                          synthesis_model=args.synthesis_model)
                 retried.append(label)
                 write_metrics(label, tag, eta, results[label],
-                              plant="plant3", reform=args.reform, note="緩和判定")
+                              plant="plant3", reform=args.reform, note="緩和判定",
+                              synthesis_model=args.synthesis_model)
                 print(f"[{i}/{len(plan)}] {label} 完了（緩和判定） "
                       f"({time.time() - t0:.0f}s)")
             except Exception as e2:                 # noqa: BLE001

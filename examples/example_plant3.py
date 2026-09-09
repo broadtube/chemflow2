@@ -19,6 +19,10 @@ plant2 との違い:
         「V_cat を仮定 → フローシートを解く → 入口流量から V_cat を再計算」
     を収束するまで繰り返す（外側の固定点反復・減衰0.5）。
 
+メタノール合成の速度論は **VBF 1996 原著（SYNTHESIS_MODEL="VBF"）が既定**。
+"KOGAS"（Ng 1999 = KOGAS 掲載値）にも切り替えられる（下の SYNTHESIS_MODEL のコメント参照）。
+build()/solve_with_sv() の synthesis_model 引数で 1 回だけ上書きすることもできる。
+
 要 reaction_rate: pip install -e ../reaction_rate
 実行: PYTHONPATH=.:../reaction_rate/src python3 examples/example_plant3.py
 """
@@ -59,6 +63,23 @@ R_MA = 2.0                 # V_MA / V_hybrid（1 mL : 2 mL）
 VM_STP = 22.414e-3         # 標準状態モル体積 [m³/mol]
 PURGE = 0.05               # 凝縮器ガスのパージ率
 
+# --- メタノール合成の速度論モデル（既定 "VBF" / 切替 "KOGAS"）---
+#: どちらも式形は同一（Vanden Bussche–Froment 1996 eq[3]）で、**前指数 A だけが違う**
+#: （活性化エネルギー B は両者共通）。reaction_rate.vbf_kogas.MS_PARAMS を参照。
+#:   "VBF"   … VBF 1996 原著 Table 2 の A。原著 FIG.5（断熱ベンチ反応器）で再現検証済
+#:             （reaction_rate/examples/vbf_fig5.py: 出口 T 553 K vs 図 550 K、
+#:              RWGS 反転 3.8 mm vs 本文 3 mm、平衡到達 35 mm vs 本文 3 cm）。
+#:   "KOGAS" … Ng, Chadwick & Toseland 1999 Table 1（= KOGAS 2008/2021 掲載値）の A。
+#:             VBF の B をそのまま使い、自分のデータに A だけ合わせ直したもの。
+#: 同一単位に換算すると **KOGAS ≈ 0.43 × VBF** の活性。設計 SV では VBF がほぼ平衡到達、
+#: KOGAS は平衡の 7 割（R1 単流の DME 出口 15.8 → 21.4 mol%）。ただしパージ 5% の高循環比
+#: ループなので**プラント指標への波及は小さい**。改質 A・baseline で実測した差
+#: （KOGAS → VBF、いずれも本スクリプトを両モデルで解いた実測値）:
+#:     plant3: 酢酸メチル +2.2% / CO パージ損失 −21% / 全触媒体積 −2.8%
+#:     plant4: 酢酸メチル +0.4% / CO パージ損失 −5%  / 触媒体積 −0.6%
+#: 既定を VBF にしたのは、**原著の図で再現検証が取れているのがこちら**だから。
+SYNTHESIS_MODEL = "VBF"
+
 gas = StreamCondition(T=250, P="5MPaG", phase="gas")   # 5 MPaG + atm = 51.0 bar
 liq = StreamCondition(T=40, P="5MPaG", phase="liquid")
 
@@ -83,7 +104,8 @@ def volume_for(n_molh: float) -> float:
 
 def build(v_tot: float, seed: dict[str, np.ndarray] | None = None,
           feed: dict[str, float] | None = None,
-          co2_removal: float | None = None, purge: float = PURGE):
+          co2_removal: float | None = None, purge: float = PURGE,
+          synthesis_model: str = SYNTHESIS_MODEL):
     """全触媒体積 v_tot [m³] のフローシートを組む。
 
     seed は前回解（初期推定）。feed を渡すと新鮮供給の組成を差し替えられる
@@ -102,6 +124,7 @@ def build(v_tot: float, seed: dict[str, np.ndarray] | None = None,
     ここには入れず example_co2_removal.caustic_scrubber() で別に解く。
 
     purge でパージ率を上書きできる（既定は PURGE=5%）。
+    synthesis_model で R1 のメタノール合成速度論を "VBF"(既定) / "KOGAS" から選ぶ。
     """
 
     def S(i: int, cond: StreamCondition = gas) -> Stream:
@@ -142,7 +165,7 @@ def build(v_tot: float, seed: dict[str, np.ndarray] | None = None,
     M1   = Mixer([Steam1, RecycleGas, RecycleMeOH], ReactorIn, name="M1")
     R1   = KineticReactor(inlet=ReactorIn, outlet=HybridOut,
                           masses={"synthesis": m_syn, "dehydration": m_deh},
-                          models={"synthesis": "KOGAS", "dehydration": "ZSM5"},
+                          models={"synthesis": synthesis_model, "dehydration": "ZSM5"},
                           k_eq3="thermo", n_points=2, name="R1 hybrid")
     R2   = KineticReactor(inlet=HybridOut, outlet=ReactorOut,
                           masses={"carbonylation": m_ma},
@@ -194,7 +217,8 @@ def solve_with_sv(max_outer: int = 8, tol: float = 1e-4, verbose: bool = True,
                   co2_removal: float | None = None, purge: float = PURGE,
                   solve_tol: float = 1e-6, progress_every: int = 0,
                   stop_at_tol: bool = False, solver_tols: float = 1e-12,
-                  solver_kwargs: dict | None = None):
+                  solver_kwargs: dict | None = None,
+                  synthesis_model: str = SYNTHESIS_MODEL):
     """SV 一定（反応器入口基準）になるまで触媒体積 V を外側反復して解く。
 
     g(V) = volume_for(反応器入口流量(V)) − V の零点を**割線法**で探す。
@@ -230,7 +254,8 @@ def solve_with_sv(max_outer: int = 8, tol: float = 1e-4, verbose: bool = True,
     def g(v: float, it: int) -> float:
         t0 = time.time()
         problem, streams = build(v, state.get("seed"), feed=feed,
-                                 co2_removal=co2_removal, purge=purge)
+                                 co2_removal=co2_removal, purge=purge,
+                                 synthesis_model=synthesis_model)
         if it == 1 and verbose:
             print("自由度 (変数, 方程式):", problem.degrees_of_freedom())
         sol = problem.solve(bounds=(0, np.inf), tol=solve_tol,
@@ -272,6 +297,7 @@ def solve_with_sv(max_outer: int = 8, tol: float = 1e-4, verbose: bool = True,
 
 def main():
     print(f"=== plant3: 速度論タンデム反応器（250℃ / 51.0 bar / SV {SV:.0f}/h・反応器入口基準）===")
+    print(f"    メタノール合成速度論: {SYNTHESIS_MODEL}")
     problem, streams, v_tot = solve_with_sv()
     (Steam1, ReactorIn, HybridOut, ReactorOut, CondGas, CondLiq, Purge,
      RecycleGas, MA_Product, Sep1Liq, RecycleMeOH, Water_Out) = streams

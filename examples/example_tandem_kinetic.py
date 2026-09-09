@@ -30,6 +30,9 @@ Out = Stream(SPECIES, name="3. MA out", order=3, condition=cond)       # 未知
 
 R1 = KineticReactor(inlet=Feed, outlet=Mid,
                     masses={"synthesis": M_SYN, "dehydration": M_DEH},
+                    # ⚠ ここは "KOGAS" のまま（reaction_rate の fig_tandem_sty_stack_zsm5.py
+                    #   と数値を 1:1 で突き合わせるためのスクリプトなので、向こうと合わせる）。
+                    #   プラント検討（example_plant3/plant4）の既定は "VBF" で別。
                     models={"synthesis": "KOGAS", "dehydration": "ZSM5"},
                     k_eq3="thermo", name="hybrid bed")
 R2 = KineticReactor(inlet=Mid, outlet=Out,

@@ -13,6 +13,10 @@ MeOH を抜いてから H-MOR 床に入れることで、水の分圧を下げ�
 基準で SV 5000/h だった）。R1 の入口は ReactorIn、R2 の入口は Cond1 のガスなので、
 2つの触媒体積を同時に満たす必要がある → 成分ごとの割線法で外側反復する。
 
+メタノール合成の速度論は **VBF 1996 原著（SYNTHESIS_MODEL="VBF"）が既定**。
+"KOGAS"（Ng 1999 = KOGAS 掲載値）にも切り替えられる（下の SYNTHESIS_MODEL のコメント参照）。
+build()/solve_with_sv() の synthesis_model 引数で 1 回だけ上書きすることもできる。
+
 要 reaction_rate: pip install -e ../reaction_rate
 実行: PYTHONPATH=.:../reaction_rate/src python3 examples/example_plant4.py
 """
@@ -65,6 +69,14 @@ F_SYN = 1.0 / 1.9          # ハイブリッド床の体積分率（synthesis �
 VM_STP = 22.414e-3         # 標準状態モル体積 [m³/mol]
 PURGE = 0.05               # Cond2 ガスのパージ率
 
+# --- メタノール合成の速度論モデル（既定 "VBF" / 切替 "KOGAS"）: plant3 と同一 ---
+#: 式形は同じで前指数 A だけが違う（B は共通）。KOGAS ≈ 0.43 × VBF の活性。
+#: 高循環比ループなのでプラント指標への波及は小さく、改質 A・baseline の実測差
+#: （KOGAS → VBF）は plant4 で 酢酸メチル +0.4% / CO パージ損失 −5% / 触媒体積 −0.6%
+#: （plant3 では +2.2% / −21% / −2.8%）。既定 VBF の理由と検証は example_plant3 の
+#: 同名定数のコメントを参照。
+SYNTHESIS_MODEL = "VBF"
+
 gas = StreamCondition(T=250, P="5MPaG", phase="gas")   # 5 MPaG + atm = 51.0 bar
 liq = StreamCondition(T=40, P="5MPaG", phase="liquid")
 
@@ -89,11 +101,13 @@ def volume_for(n_molh: float) -> float:
 def build(v1: float, v2: float, seed: dict[str, np.ndarray] | None = None,
           feed: dict[str, float] | None = None,
           co2_removal: float | None = None, purge: float = PURGE,
-          co2_position: str = "recycle"):
+          co2_position: str = "recycle",
+          synthesis_model: str = SYNTHESIS_MODEL):
     """ハイブリッド床 v1 [m³]・カルボニル化床 v2 [m³] のフローシートを組む。
 
     feed を渡すと新鮮供給の組成を差し替えられる（前工程 pattern1 の DryGas を
     そのまま流し込むため。既定は STEAM1）。
+    synthesis_model で R1 のメタノール合成速度論を "VBF"(既定) / "KOGAS" から選ぶ。
 
     co2_removal に除去率 η を渡すと CO2 除去塔を 1 段挿す。plant4 は凝縮器が
     2 つあるので、**どちらに付けるかを co2_position で選ぶ**:
@@ -162,7 +176,7 @@ def build(v1: float, v2: float, seed: dict[str, np.ndarray] | None = None,
     M1   = Mixer([Steam1, RecycleGas, RecycleMeOH], ReactorIn, name="M1")
     R1   = KineticReactor(inlet=ReactorIn, outlet=R1Out,
                           masses={"synthesis": m_syn, "dehydration": m_deh},
-                          models={"synthesis": "KOGAS", "dehydration": "ZSM5"},
+                          models={"synthesis": synthesis_model, "dehydration": "ZSM5"},
                           k_eq3="thermo", n_points=2, name="R1 hybrid")
     Cond1 = Separator(R1Out, [Cond1Gas, Cond1Liq], name="Cond1")
     Col1  = Separator(Cond1Liq, [Col1Top, Sep1Liq], name="Column1")
@@ -230,7 +244,8 @@ def solve_with_sv(max_outer: int = 10, tol: float = 1e-4, verbose: bool = True,
                   co2_position: str = "recycle", solve_tol: float = 1e-4,
                   progress_every: int = 0, stop_at_tol: bool = False,
                   solver_tols: float = 1e-12, solver_kwargs: dict | None = None,
-                  sv_mode: str = SV_MODE_DEFAULT):
+                  sv_mode: str = SV_MODE_DEFAULT,
+                  synthesis_model: str = SYNTHESIS_MODEL):
     """触媒体積 (V1, V2) を外側反復で決める。狙う値は sv_mode で変わる。
 
         per-bed : g(V) = [volume_for(ReactorIn) − V1, volume_for(R2の入口) − V2]
@@ -249,7 +264,8 @@ def solve_with_sv(max_outer: int = 10, tol: float = 1e-4, verbose: bool = True,
         t0 = time.time()
         problem, streams = build(v[0], v[1], state.get("seed"), feed=feed,
                                  co2_removal=co2_removal, purge=purge,
-                                 co2_position=co2_position)
+                                 co2_position=co2_position,
+                                 synthesis_model=synthesis_model)
         if it == 1 and verbose:
             print("自由度 (変数, 方程式):", problem.degrees_of_freedom())
         # tol は残差ノルムの合格判定。PFR は rtol=1e-8 で積分しているので残差には
@@ -321,6 +337,7 @@ def solve_with_sv(max_outer: int = 10, tol: float = 1e-4, verbose: bool = True,
 
 def main():
     print(f"=== plant4: 2段反応器（250℃ / 51.0 bar / 各床とも入口基準 SV {SV:.0f}/h）===")
+    print(f"    メタノール合成速度論: {SYNTHESIS_MODEL}")
     problem, streams, v = solve_with_sv()
     (Steam1, ReactorIn, R1Out, Cond1Gas, Cond1Liq, Col1Top, Sep1Liq, RecycleMeOH,
      Water, R2Out, Cond2Gas, Purge, RecycleGas, Cond2Liq, MA_Product,

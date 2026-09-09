@@ -40,7 +40,7 @@ class KineticReactor(Unit):
         R1 = KineticReactor(
             inlet=S1, outlet=S2,
             masses={"synthesis": 6.84e-4, "dehydration": 3.79e-4},  # [kg]
-            models={"synthesis": "KOGAS", "dehydration": "ZSM5"},
+            models={"synthesis": "VBF", "dehydration": "ZSM5"},
             k_eq3="thermo", T=250, P="51bar", name="hybrid bed")
         # カルボニル化床（H-MOR）
         R2 = KineticReactor(
@@ -55,6 +55,9 @@ class KineticReactor(Unit):
         {役割: 触媒質量[kg]}。役割 = 'synthesis'/'dehydration'/'carbonylation'。
     models : dict[str, str]
         {役割: モデル名}（例 dehydration:'ZSM5', carbonylation:'DTU-Cheung2007-2'）。
+        synthesis は 'VBF'（Vanden Bussche–Froment 1996 原著）/ 'KOGAS'（Ng 1999）/
+        'Graaf1988'。VBF と KOGAS は式形も活性化エネルギーも同じで前指数 A だけが違い、
+        同一単位では KOGAS ≈ 0.43×VBF の活性。example_plant3/plant4 の既定は 'VBF'。
     k_eq3 : str
         脱水平衡定数 'thermo'(推奨)/'BL'/'KOGAS'(過大・非推奨)。
     acid_site_density : float
