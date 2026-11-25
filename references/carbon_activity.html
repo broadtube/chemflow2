@@ -692,6 +692,71 @@
         熱力学データは JANAF と一致している。定義（Boudouard 1 本）も平衡気相では
         本実装の 3 経路最大値と厳密に同値（ばらつき ≤ 2×10⁻¹²）。</p>
     </div>
+
+    <h3 style="font-size:15px;margin:26px 0 10px;">6.2 &nbsp;「平衡定数 K だけが違う」と仮定したモデル選択 — 仮定そのものが棄却される</h3>
+    <p class="cite">2026-11-26 追記 · 再現: <code>PYTHONPATH=. python3 -u examples/example_chiyoda_K_model_fit.py</code></p>
+    <p>WO2012140994A1 表5 の実施例 1〜4（全部 Ac = 0.90）に対して本実装は <b>+3.3 / +3.6 / +3.2 / +1.7%</b> 高い
+      （実施例4 は S/C「−」を水蒸気なし・CH₄:CO₂ = 1:2.4 と読んだ補助点。出口 H₂/CO 0.53 は表の 0.5 と合う）。
+      これを K の違いだけで説明できるか確かめた。組成（Q = p<sub>CO</sub>²/p<sub>CO₂</sub>）が同じなら比の対数は温度だけの関数になる:</p>
+    <div class="eqcard">
+      <div class="cap"><span class="name">ln r &nbsp;（K だけが違うとき）</span><span class="unit">無次元</span></div>
+      <div class="eqbody">
+        \[ \ln r \;=\; \ln\frac{a_{C,\text{本実装}}}{a_{C,\text{特許}}} \;=\; \ln K_\text{本実装}-\ln K_\text{特許} \;=\; -\frac{\Delta\Delta G^{\circ}(T)}{RT} \]
+      </div>
+    </div>
+    <p>候補は M0: <i>B</i>（定数倍。atm/bar なら |B| = 0.013）、M1: <i>A/T</i>、M2: <i>A/T + B</i>、
+      M3: <i>A/T + B + C</i> ln <i>T</i>（ΔCp の差）、M4: M2 + <i>E·P/T</i>（非理想性）。係数は
+      ΔΔH = −R·A、<b>ΔΔS = +R·B</b>、ΔΔCp = +R·C（ln K の定数項は +ΔS/R なので ΔΔS の符号は + ）。
+      各点の 1σ は Ac の 2 桁丸めと供給比の丸め（群 B・C）から見積もった。</p>
+
+    <figure>
+      <img src="chiyoda_K_model_fit.png" alt="ln r の温度依存と、同じ T・P での ln r のばらつき">
+      <figcaption>左: ln r 対 1000/T と、21 点に当てはめた M0/M2/M3。白抜きは WO 実施例4（補助点）。
+        右: 850 ℃・2.0 MPaG の 8 点。K(T, P) の形をしたモデルはここで<b>1 つの値</b>しか出せない。
+        生成: <code>examples/example_chiyoda_K_model_fit.py</code></figcaption>
+    </figure>
+
+    <div class="tbl-scroll">
+      <table>
+        <caption>全 21 点への当てはめ（重みなし）。「床」は (T, P) セルごとの平均＝K(T, P) 型モデルの到達限界</caption>
+        <thead><tr><th>モデル</th><th>RMS</th><th>AIC</th><th>BIC</th><th>重み付き χ²/dof</th><th>係数</th></tr></thead>
+        <tbody>
+          <tr><td>M0 &nbsp;B</td><td>0.088</td><td>−100.3</td><td>−99.2</td><td>403</td><td>B = +0.035 ± 0.020</td></tr>
+          <tr><td>M1 &nbsp;A/T</td><td>0.087</td><td>−100.6</td><td>−99.6</td><td>408</td><td>A = +38 ± 20 K</td></tr>
+          <tr><td>M2 &nbsp;A/T + B</td><td>0.086</td><td>−99.1</td><td>−97.0</td><td>269</td><td>A = +151 ± 170、B = −0.11 ± 0.16</td></tr>
+          <tr><td>M3 &nbsp;+ C ln T</td><td>0.086</td><td>−97.1</td><td>−94.0</td><td>281</td><td>全係数が誤差の内側</td></tr>
+          <tr><td>M4 &nbsp;+ E P/T</td><td>0.081</td><td>−99.5</td><td>−96.3</td><td>265</td><td>E = +5.2 ± 3.6</td></tr>
+          <tr><td><b>床（6 セル平均）</b></td><td><b>0.025</b></td><td>—</td><td>—</td><td><b>53</b></td><td>丸めだけなら χ²/dof ≈ 1</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="note acc">
+      <p class="h">結論 — M0〜M4 のどれを選ぶか以前に、「K だけが違う」が成り立たない</p>
+      <ul style="margin:6px 0 0 18px;line-height:1.85;">
+        <li><b>同じ (T, P) で ln r がばらつく。</b> 850 ℃・2.0 MPaG の 8 点（群 A 7 点 + WO 実施例2）で
+          ln r は −0.090〜+0.036、<b>幅 0.126</b>。各点の 1σ（0.001〜0.014）の 9 倍以上。
+          K だけの差なら M4 まで含めて ln r は (T, P) の関数なので、ここは 1 つの値になるはず。
+          この純誤差が床（RMS 0.025・χ²/dof 53）を作り、M0〜M4 はどれも床の 3 倍以上で
+          AIC/BIC も 3 以内に横並び＝<b>温度で説明できる成分が無い</b>。</li>
+        <li><b>WO 実施例2 と群 A は同じ 850 ℃・2.0 MPaG・同じ会社・同じ定義・同じ Stull 1969 なのに符号が逆</b>
+          （+0.036 対 −0.03〜−0.09）。文献ごとに K を変えたとしても群 A 内部の 0.058 の幅は残る。</li>
+        <li><b>群 A だけなら M2 が RMS 0.017 まで下がるが見かけだけ。</b> 温度が 650/850 ℃ の 2 水準なので
+          2 パラメータで 2 つのセル平均をなぞったにすぎない。係数は ΔΔH = −7.5 kJ/mol・ΔΔS = −7.2 J/(mol·K)
+          で、まともな出典どうしの差（≤ 0.8 kJ/mol、検算 3）の 10 倍。875 ℃ に外挿すると ln r = −0.085 で、
+          群 B の実測 +0.075〜+0.154 と符号まで逆。</li>
+        <li><b>WO 実施例 1〜4 だけなら M0 で収まる</b>（B = +0.029 ± 0.004 ＝本実装が +3.0%）。
+          ただし特許が bar なら本実装は 1.3% <b>低く</b>出る向きで、符号が逆なので単位では説明できない。
+          しかも 0.90 は設計目標値で、供給比の丸め（S/C 0.85 など）だけで 0.3〜1.4% 動く。K の版差の証拠としては弱い。</li>
+        <li><b>入口の CH₄ 分解（§8.2 の有識者 2 点）とも共通しない。</b> ΔΔG<sub>M</sub> = −3.24 / −3.09 kJ/mol に対し、
+          出口 Boudouard は ΔΔG<sub>B</sub> ≈ −0.2（M0）〜 −0.6 kJ/mol（M2 外挿）。3 反応に共通する炭素の項が原因なら
+          一致するはず（ただし出典が別人なので比較自体は弱い）。</li>
+        <li>同じセル内の偏差は ln(p<sub>CO</sub>/p<sub>CO₂</sub>)・y<sub>H₂O</sub>・y<sub>CH₄</sub>・ln Ac のどれとも
+          有意な相関が無い（Spearman |ρ| ≤ 0.33、p ≥ 0.15）。点ごとに違う組成の前提（検算 4 の approach など）と読むのが自然。</li>
+      </ul>
+      <p>→ §6 の結論（残差の主因は特許側の組成の前提・丸め・社内シミュレータ）を補強する。
+        <b>§7 の決定（gri30/JANAF のまま・K は補正しない）は変わらない。</b></p>
+    </div>
   </section>
 
   <!-- ============ 出典の選択 ============ -->
